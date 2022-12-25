@@ -90,7 +90,6 @@ class FSCDataset(Dataset):
         return [img], [target]
 
     def __getitem__(self, idx):
-        idx = idx%3 + 10
         images, targets = self._pre_single_frame(idx)
         if self.transform is not None:
             images, targets = self.transform(images, targets)
@@ -104,8 +103,7 @@ class FSCDataset(Dataset):
         return {
             'imgs': images,
             'gt_instances': gt_instances,
-            'proposals': [torch.zeros(0,5) for _ in range(len(images))],
-            'patches': exemplar,
+            'exemplar': exemplar,
         }
 
 
@@ -124,9 +122,7 @@ class FSCDataset(Dataset):
         pad_size = max(pad_size, 64)
         paddings = ((pad_size-patch.shape[2])//2, (pad_size-patch.shape[1])//2, pad_size-patch.shape[2]-(pad_size-patch.shape[2])//2, pad_size-patch.shape[1]-(pad_size-patch.shape[1])//2)
         img =  torchvision.transforms.functional.pad(patch, paddings)
-        mask = torch.ones((1,img.shape[1],img.shape[2]), dtype=torch.bool, device=img.device)
-        mask[:, paddings[1]:-paddings[3], paddings[0]:-paddings[2]] = False
-        return [img.unsqueeze(0), mask]
+        return [img.unsqueeze(0)]
 
     def set_epoch(self, epoch):
         self.current_epoch = epoch

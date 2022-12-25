@@ -62,7 +62,8 @@ def get_args_parser():
 
     # * Position Embedding
     parser.add_argument('--position_embedding', default='sine_sum', type=str, choices=('sine_sum', 'sine_concat'),
-                        help="Type of positional embedding to use on top of the image features")
+                                                                            help="Type of positional embedding to use on top of the image features")
+    parser.add_argument('--use_fnn', action='store_true',                   help="pass encodings through a FFNN before and after the decoder")
 
     # * Transformer
     parser.add_argument('--exemp_features_key', action='store_true',        help="special version of DEF Transformer: queries learned; concat exemplar to keys")

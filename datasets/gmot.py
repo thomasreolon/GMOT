@@ -114,8 +114,7 @@ class GMOTDataset(Dataset):
         return {
             'imgs': images,
             'gt_instances': gt_instances,
-            'proposals': [torch.zeros(0,5) for _ in range(len(images))],
-            'patches': exemplar,
+            'exemplar': exemplar,
         }
 
     def __len__(self):
@@ -133,9 +132,7 @@ class GMOTDataset(Dataset):
         pad_size = max(pad_size, 64)
         paddings = ((pad_size-patch.shape[2])//2, (pad_size-patch.shape[1])//2, pad_size-patch.shape[2]-(pad_size-patch.shape[2])//2, pad_size-patch.shape[1]-(pad_size-patch.shape[1])//2)
         img =  torchvision.transforms.functional.pad(patch, paddings)
-        mask = torch.ones((1,img.shape[1],img.shape[2]), dtype=torch.bool, device=img.device)
-        mask[:, paddings[1]:-paddings[3], paddings[0]:-paddings[2]] = False
-        return [img.unsqueeze(0), mask]
+        return [img.unsqueeze(0)]
 
 
     def _pre_single_frame(self, vid, idx):
