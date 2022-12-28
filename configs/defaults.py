@@ -17,10 +17,6 @@ def get_args_parser():
     ## GENERAL
     parser.add_argument('--device', default='cuda',                         help='device to use for training / testing')
     parser.add_argument('--seed', default=42, type=int)
-    parser.add_argument('--cache_mode', default=False, action='store_true', help='whether to cache images on memory')
-    parser.add_argument('--sample_mode', type=str, default='random_interval')
-    parser.add_argument('--sample_interval', type=int, default=20)
-    parser.add_argument('--sampler_lengths', type=int, nargs='*', default=[5])
 
     # * Training settings
     parser.add_argument('--meta_arch', default='gmot', type=str,            help="model architecture to be used")
@@ -33,12 +29,15 @@ def get_args_parser():
     parser.add_argument('--lr_backbone', default=2e-5, type=float)
     parser.add_argument('--lr_linear_proj_names', default=['reference_points', 'sampling_offsets',], type=str, nargs='+')
     parser.add_argument('--lr_linear_proj_mult', default=0.1, type=float)
-
     parser.add_argument('--batch_size', default=1, type=int)
-    parser.add_argument('--num_workers', default=2, type=int)
-    parser.add_argument('--cache_mode', action='store_true')
     parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--clip_max_norm', default=0.1, type=float,         help='gradient clipping max norm')
+
+    parser.add_argument('--num_workers', default=2, type=int)
+    parser.add_argument('--cache_mode', action='store_true')
+    parser.add_argument('--sample_mode', type=str, default='random_interval')
+    parser.add_argument('--sample_interval', type=int, default=20)
+    parser.add_argument('--sampler_lengths', type=int, nargs='*', default=[5])
 
     # * Test
     parser.add_argument('--max_size', default=1333, type=int)
@@ -47,17 +46,18 @@ def get_args_parser():
 
 
     ## ARCHITECTURE
-    # * Img Resize
+    parser.add_argument('--embedd_dim', default=256, type=int,              help="Size of the embeddings (num channels)")
+    
+    # * PreBackbone
     parser.add_argument('--img_prep', default='padder', type=str,           help="padding, resizing, ...")
 
     # * Backbone
-    parser.add_argument('--backbone', default='resnet50', type=str,         help="name of the backbone to use")
-    parser.add_argument('--num_feature_levels', default=3, type=int,        help='number of feature levels')
-    parser.add_argument('--embedd_dim', default=256, type=int,              help="Size of the embeddings (num channels)")
+    parser.add_argument('--backbone', default='revbifpn', type=str,         help="name of the backbone to use")
+    parser.add_argument('--num_feature_levels', default=4, type=int,        help='number of feature levels')
 
     # * Mixer
     parser.add_argument('--mix_return', default=['ch','q','feat'], type=str, nargs='+', help="what to return from mixer")
-    parser.add_argument('--mix_arch', default='ViT+IdaUp', type=str,         help="what to return from mixer")
+    parser.add_argument('--mix_arch', default='motr', type=str,         help="what to return from mixer")
     parser.add_argument('--q_extractor', default='circle', type=str,         help="how to go from exemplar feature maps to less queries (avg, multiple)")
 
     # * Position Embedding
