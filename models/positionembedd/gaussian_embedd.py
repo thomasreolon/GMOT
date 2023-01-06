@@ -27,11 +27,11 @@ class GaussianEmbedder(torch.nn.Module):
     def get_q_pos(self, ref_pts):
         size = self.size //2
         h_embedd = (torch.arange(size)/ size +0.5/size).view(1,-1)
-        h_embedd = h_embedd - ref_pts[:,0].unsqueeze(1)
+        h_embedd = h_embedd - ref_pts[:,1].unsqueeze(1)
         h_embedd = 0.01 + torch.exp(-h_embedd**2 *self.strength)
 
         w_embedd = (torch.arange(size)/ size +0.5/size).view(1,-1)
-        w_embedd = w_embedd - ref_pts[:,1].unsqueeze(1)
+        w_embedd = w_embedd - ref_pts[:,0].unsqueeze(1)
         w_embedd = 0.01 + torch.exp(-w_embedd**2 *self.strength)
 
         return torch.cat((h_embedd, w_embedd), dim=1).to(ref_pts.device)

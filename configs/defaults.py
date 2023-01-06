@@ -61,7 +61,8 @@ def get_args_parser():
     parser.add_argument('--q_extractor', default='circle', type=str,         help="how to go from exemplar feature maps to less queries (avg, multiple)")
 
     # * Position Embedding
-    parser.add_argument('--position_embedding', default='sine_sum', type=str, choices=('sine_sum', 'sine_concat'),
+    parser.add_argument('--position_embedding', default='gauss_cat', type=str, 
+                        choices=('sin_sum', 'sin_cat', 'gauss_sum', 'gauss_cat'),
                                                                             help="Type of positional embedding to use on top of the image features")
     parser.add_argument('--use_fnn', action='store_true',                   help="pass encodings through a FFNN before and after the decoder")
 
@@ -73,7 +74,6 @@ def get_args_parser():
     parser.add_argument('--dropout', default=0.1, type=float,               help="Dropout applied in the transformer")
     parser.add_argument('--nheads', default=2, type=int,                    help="Number of attention heads inside the transformer's attentions")
     parser.add_argument('--dec_n_points', default=4, type=int)
-    parser.add_argument('--enc_n_points', default=4, type=int)
 
     # * Variants of Deformable DETR
     # parser.add_argument('--with_box_refine', default=True, action='store_true')

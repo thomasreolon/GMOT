@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 
 from .nothing import LearnedQueries
@@ -22,5 +21,4 @@ class GeneralMixer(nn.Module):
         self.mixer = get_main_mixer(args.mix_arch, args.num_queries, args.embedd_dim)
 
     def forward(self, multiscale_img_feats, multiscale_exe_features):
-
         return self.mixer(multiscale_img_feats, multiscale_exe_features)

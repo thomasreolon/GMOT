@@ -14,9 +14,9 @@ class LearnedQueries(nn.Module):
 
     
     def forward(self, multiscale_img_feats, multiscale_exe_feats):
-        learned_queries = (self.ref_pts.weight.data, self.q_embed.weight.data)
+        learned_queries = self.q_embed.weight.data, self.ref_pts.weight.data
 
         # new img features,  queries to use in decoder,   keys to concat to decoder
-        return multiscale_img_feats,     learned_queries,            None
+        return multiscale_img_feats,     *learned_queries,           None, None
 
 

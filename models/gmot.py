@@ -1,13 +1,10 @@
 """
 GMOT-DETR model and criterion classes.
 """
-import copy
 import math
-import numpy as np
 import torch
 import torch.nn.functional as F
-from torch import nn, Tensor
-from typing import List
+from torch import nn
 
 from util.misc import CheckpointFunction
 
@@ -394,6 +391,10 @@ class MOTR(nn.Module):
             outputs['losses_dict'] = self.criterion.losses_dict
         return outputs
 
+from .prebackbone import GeneralPreBackbone
+from .backbone import GeneralBackbone
+from .mixer import GeneralMixer
+from .positionembedd import GeneralPositionEmbedder
 
 def build(args):
     model = GMOT(args)
@@ -413,11 +414,11 @@ class GMOT(torch.nn.Module):
         # self.track_embed = track_embed        # used in post process eval
         # self.use_checkpoint = use_checkpoint  # to look into
         # self.query_denoise = query_denoise   # add noise to GT in training
-        self.prebk    = PreBackbone(args)
-        self.backbone = Backbone(args)
-        self.mixer    = Mixer(args)
-        self.posembed = PositionEmbedd(args)
-        self.decoder  = Decoder(args)
+        self.prebk    = GeneralPreBackbone(args)
+        self.backbone = GeneralBackbone(args)
+        self.mixer    = GeneralMixer(args)
+        self.posembed = GeneralPositionEmbedder(args)
+        self.decoder  = GeneralDecoder(args)
 
         self.head = nn.Sequential(
             nn.Linear(hidden_dim, 1024),
