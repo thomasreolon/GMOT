@@ -173,8 +173,8 @@ class DeformableTransformer(nn.Module):
             pos_trans_out = self.pos_trans_norm(self.pos_trans(self.get_proposal_pos_embed(topk_coords_unact)))
             query_embed, tgt = torch.split(pos_trans_out, c, dim=2)
         else:
-            tgt = query_embed.unsqueeze(0).expand(bs, -1, -1)
-            reference_points = ref_pts.unsqueeze(0).expand(bs, -1, -1)
+            tgt = query_embed
+            reference_points = ref_pts
             init_reference_out = reference_points
         # decoder
         hs, inter_references = self.decoder(tgt, reference_points, memory,

@@ -9,10 +9,16 @@ class Padder(torch.nn.Module):
         super().__init__()
         self.padding=padding
     
-    def forward(self, x):
-        _, _, h, w = x.shape
+    def forward(self, x, mask=None):
+        b, _, h, w = x.shape
+        assert mask is None or mask.shape[1]==h and mask.shape[2]==w, "mask has a different shape from x"
+        
+        if mask is None:
+            mask = torch.zeros((b,h,w), device=x.device)
+
         pad = self.padding
         new_h = (h+pad-1) //pad *pad
         new_w = (w+pad-1) //pad *pad
         x = T.pad(x, (0,0,new_w-w,new_h-h),padding_mode="reflect")
-        return x
+        mask = T.pad(mask, (0,0,new_w-w,new_h-h), fill=1)
+        return x, mask

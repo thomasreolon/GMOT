@@ -1,19 +1,20 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from .resnet import ResNet
 from .revbifpn import Revbifpn
 
 
-def get_main_backbone(type, n_levels, ch_in):
-    "This is the type of preprocessing done before the real backbone, can: resize image, add padding to make img divisible by 32, extract some channels in advance, ..."
+def get_main_backbone(name, n_levels, ch_in):
+    "select the type of backbone for feature multiple extraction from an image"
 
     # TODO: in general backbone, if ch_in!=3: substitute the first conv (or in the specific net code)
-    assert ch_in==3, 'for now is mandatory to have 3 input channels'
+    assert ch_in==3, 'for now it is mandatory to have 3 input channels'
 
-    if type == 'resnet50':
+    if name == 'resnet50':
         return ResNet('resnet50', True, True, False)
-    if type == 'revbifpn':
+    if name == 'revbifpn':
         return Revbifpn(n_levels)
     else:
         raise NotImplementedError()
@@ -55,7 +56,7 @@ class GeneralBackbone(nn.Module):
                 nn.GELU(),
             ))
 
-    def forward(self, x, outputs_dict=None):
+    def forward(self, x, mask, outputs_dict=None):
         # get featuremaps from core backbone
         feature_maps = list(self.body(x))
 
@@ -68,4 +69,13 @@ class GeneralBackbone(nn.Module):
         for i in range(len(feature_maps)):
             feature_maps[i] = self.linear_proj[i]( feature_maps[i] )
         
-        return feature_maps[-self.args.num_feature_levels:]
+        # select only num_feature_levels
+        feature_maps = feature_maps[-self.args.num_feature_levels:]
+
+        # make masks of multi sizes
+        masks = []
+        for f in feature_maps:
+            tmp = F.interpolate(mask.unsqueeze(1), size=f.shape[-2:])
+            masks.append(tmp.to(torch.bool).squeeze(1))
+
+        return feature_maps, masks

@@ -4,7 +4,7 @@ from .sine_embedd import SinCosEmbedder
 from .embedders import ConcatPos, SumPos
 
 def get_position_type(name, size):
-    "This is the type of preprocessing done before the real backbone, can: resize image, add padding to make img divisible by 32, extract some channels in advance, ..."
+    "type of position embedding to be used embedding (sine, others)"
 
     if 'sin' in name:
         return SinCosEmbedder(size)
@@ -16,7 +16,7 @@ def get_position_type(name, size):
         raise NotImplementedError()
 
 def get_fuser(name, emb_all, emb_pos):
-    "This is the type of preprocessing done before the real backbone, can: resize image, add padding to make img divisible by 32, extract some channels in advance, ..."
+    "how to use position ambeddings (sum/concat)"
 
     if 'cat' in name:
         return ConcatPos(emb_all, emb_pos)
@@ -50,8 +50,10 @@ class GeneralPositionEmbedder(nn.Module):
     def make_queries(self, q, q_ref):
         if q is None: return None
 
-        q_pos = self.embedder.get_q_pos(q_ref)
-        return self.fuser(q, q_pos)
+        b,n,c = q.shape
+        q_pos = self.embedder.get_q_pos(q_ref.view(b*n, 4))
+        q = self.fuser(q.view(b*n, -1), q_pos)
+        return q.view(b,n,c)
 
     def make_features(self, msf):
         poss = [self.embedder.get_fmap_pos(img) for img in msf]

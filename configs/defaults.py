@@ -67,6 +67,7 @@ def get_args_parser():
     parser.add_argument('--use_fnn', action='store_true',                   help="pass encodings through a FFNN before and after the decoder")
 
     # * Transformer
+    parser.add_argument('--dec_name', default='base', type=str)
     parser.add_argument('--exemp_features_key', action='store_true',        help="special version of DEF Transformer: queries learned; concat exemplar to keys")
     parser.add_argument('--num_queries', default=100, type=int,             help="Number of query slots") #NOTE: MOT20=300,   DANCETRACK=10, ....
     parser.add_argument('--dec_layers', default=6, type=int,                help="Number of decoding layers in the transformer")

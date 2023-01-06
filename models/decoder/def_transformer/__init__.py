@@ -30,16 +30,23 @@ class OriginalDefDetr(torch.nn.Module):
 
         self.encoderdecoder = build_deforamble_transformer(args)
 
-    def forward(self, srcs, cat_keys, q, q_ref, attn_mask, srcs_mask=None):
-        assert cat_keys is None, "Original DefDetr do no support concat of keys"
+    def forward(self, img_features, add_src, q_emb, q_ref, attn_mask, srcs_mask=None):
+        assert add_src is None, "Original DefDetr do no support concat of keys"
 
         # attend to all input
         if srcs_mask is None:
-            srcs_mask = [torch.zeros_like(sr) for sr in srcs]
-            srcs_mask = [sr[:,0].bool() for sr in srcs]
+            srcs_mask = [torch.zeros_like(sr) for sr in img_features]
+            srcs_mask = [sr[:,0].bool() for sr in img_features]
 
         hs, init_reference, inter_references, _, _ = \
-            self.encoderdecoder(srcs, srcs_mask, None, q, ref_pts=q_ref,
-                                mem_bank=None, mem_bank_pad_mask=None, attn_mask=attn_mask)
+            self.encoderdecoder(
+                srcs=img_features,
+                masks=srcs_mask, 
+                pos_embeds=None, 
+                query_embed=q_emb, 
+                ref_pts=q_ref, 
+                attn_mask=attn_mask
+            )
+                        
         refs = None # fn(init, inter_ref)
         return hs, refs
