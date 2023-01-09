@@ -34,13 +34,18 @@ def main(args):
 
     # Training Loop
     start_time = time.time()
+    debug_epochs = {args.start_epoch, (args.epochs+args.start_epoch)//2, args.epochs-1} # when save info images
     for epoch in range(args.start_epoch, args.epochs):
         start_e_time = time.time()
         if args.distributed:
             sampler.set_epoch(epoch)
 
+        debug = None
+        if args.debug and epoch in debug_epochs:
+            debug = f'epoch_{epoch}/img{distrib.get_rank()}_'
+
         # Train
-        train_one_epoch(model, criterion, data_loader_train, optimizer, device, epoch, args)
+        train_one_epoch(model, criterion, data_loader_train, optimizer, device, epoch, args, debug)
         lr_scheduler.step()
         tr_dataset.step_epoch()
 
@@ -61,5 +66,6 @@ def main(args):
 if __name__=='__main__':
     args = get_args_parser().parse_args()
     if args.output_dir:
-        os.makedirs(args.output_dir, exist_ok=True)
+        os.makedirs(args.output_dir+'/debug', exist_ok=True)
+        if args.debug: os.system(f'rm -r "{args.output_dir}/debug/*"')
     main(args)

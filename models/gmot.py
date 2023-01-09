@@ -1,19 +1,16 @@
 """
 GMOT-DETR model and criterion classes.
 """
-import math
+import os
+import numpy as np
+import cv2
+
 import torch
 import torch.nn.functional as F
 from torch import nn
 
 from util.misc import CheckpointFunction
 from util.misc.instance import TrackInstances
-
-# from util.misc import (NestedTensor, nested_tensor_from_tensor_list,
-#                        accuracy, get_world_size, interpolate, get_rank,
-#                        is_dist_avail_and_initialized, inverse_sigmoid, box_ops, checkpoint)
-
-# from util.misc import Instances, Boxes, pairwise_iou, matched_boxlist_iou
 
 from .prebackbone import GeneralPreBackbone
 from .backbone import GeneralBackbone
@@ -51,7 +48,7 @@ class GMOT(torch.nn.Module):
             self.q_embed = nn.Embedding(args.num_queries, hidden_dim)
 
 
-    def forward(self, data):
+    def forward(self, data, debug=None):
         """
             data['imgs']         = list_of_CHW_tensors  --> [torch.rand(3,256,256), torch.rand(3,256,256), ...]
             data['gt_instances'] = list_of_gt_instances  --> [inst1, inst2, ...]     , with i containing (boxes, obj_ids)
@@ -60,7 +57,7 @@ class GMOT(torch.nn.Module):
 
         # initially no tracks
         outputs = []
-        track_instances = TrackInstances(self.args.embedd_dim, self.args.det_thresh)
+        track_instances = TrackInstances(self.args.embedd_dim, self.args.det_thresh, self.args.keep_for)
         exemplars = torch.stack(data['exemplar'][:1]) # TODO: support multiple exemplars?
         
         # iterate though all frames
@@ -72,7 +69,30 @@ class GMOT(torch.nn.Module):
             outputs.append(output)
             # exemplars = exemplars ##### TODO: maybe update
 
+        if debug:
+            with torch.no_grad():
+                os.makedirs(self.args.output_dir+'/debug/'+debug.split('/')[-2], exist_ok=True)
+                self.debug_infographics(data['imgs'], outputs, data['gt_instances'], 0, debug)
+                self.debug_infographics(data['imgs'], outputs, data['gt_instances'], -1, debug)
+
         return outputs
+
+    def debug_infographics(self, frames, outputs, gt, num, path):
+        # where to save the file
+        if num==-1: num = len(frames)-1
+        path = path+f'f{num}_'
+
+        # info needed on that frame
+        frame = frames[num].unsqueeze(0)
+        q_ref = outputs[num]['q_ref']
+        coord = outputs[num]['position']
+        isobj = outputs[num]['is_object']
+        n_prop = q_ref.shape[1] - len(gt[num])
+
+        # helper functions for graphics
+        self.debug_qref_start(frame, q_ref, n_prop, path)
+        self.debug_qref_steps(frame, q_ref, coord, isobj, n_prop, path)
+
 
     def _forward_frame(self, frame, exemplars, noised_gt, track_instances):
         """
@@ -98,14 +118,13 @@ class GMOT(torch.nn.Module):
 
             # make tracking queries [proposed+previous+GT] or [learned+previous+GT]
             # make input tensors for decorer:   eg.   q_embedd = cat(track.embedd, gt)
-            q_queries, q_ref, attn_mask = \
+            q_queries, q_ref, confidence, attn_mask = \
                 self.update_track_instances(img_features, q_prop_refp, track_instances, noised_gt)
-
-            img_features, q_queries, _ = self.posembed(img_features, q_queries, None, q_ref, None)
+            img_features, q_queries, _ = self.posembed(img_features, q_queries, None, q_ref, None, confidence)
             dict_outputs['input_hs'] = q_queries
+            dict_outputs['q_ref'] = q_ref
 
             # TODO: change how ref_pts are updated
-            print(q_ref.shape)
             hs, isobj, coord = self.decoder(img_features, add_keys, q_queries, q_ref, attn_mask, img_masks)
             dict_outputs['output_hs'] = hs
             dict_outputs['is_object'] = isobj
@@ -148,7 +167,11 @@ class GMOT(torch.nn.Module):
         attn_mask = torch.zeros((n_tot, n_tot), dtype=bool, device=q_queries.device)
         attn_mask[:n_gt, n_gt:] = True
 
-        return q_queries.unsqueeze(0), q_ref_pts.unsqueeze(0), attn_mask
+        # confidences for position embedding
+        gt_conf = torch.ones(n_gt) * self.args.keep_for # max confidence
+        confidences = torch.cat((track_instances.lives, gt_conf), dim=-1)
+
+        return q_queries.unsqueeze(0), q_ref_pts.unsqueeze(0), confidences, attn_mask
 
     def make_q_from_ref(self, ref_pts, img_features):
         queries = []
@@ -164,3 +187,47 @@ class GMOT(torch.nn.Module):
         boxes = gt.boxes
         return boxes + torch.rand_like(boxes)*0.08 -0.04
 
+    def _debug_frame(self, frame):
+        """util to make frame to writable"""
+        frame = np.ascontiguousarray(frame[0].clone().permute(1,2,0).numpy() [:,:,::-1]) /4+0.4 # frame in BGR
+        frame = np.uint8(255*(frame-frame.min())/(frame.max()-frame.min()))
+        h,w,_ = frame.shape
+        return cv2.resize(frame, (400,int(400*h/w)))
+
+
+    def _debug_qref(self, frame, q_ref, n_prop, opacity=1):
+        """util to print q_refs on frame"""
+        q_ref = q_ref[0,:,:2]
+        H,W,_ = frame.shape
+        for i, (w, h) in enumerate(q_ref):
+            color = (80,250,90) if i<n_prop else (150,100,240)
+            color = tuple((c*opacity for c in color))
+            w = int(w*W)
+            h = int(h*H)
+            frame[h-2:h+3,w-2:w+3] = (frame[h-2:h+3,w-2:w+3].astype(float) * (1-opacity)*0.8).astype(np.uint8)
+            frame[h-1:h+2,w-1:w+2] = ((1-opacity)*frame[h-1:h+2,w-1:w+2].astype(float) + color).astype(np.uint8)
+        return frame
+    
+    def debug_qref_start(self, frame, q_ref, n_prop, path):
+        """save image with initial reference points"""
+        out_file = self.args.output_dir+f'/debug/{path}ref_start.jpg'
+        if not os.path.exists(out_file):
+            frame = self._debug_frame(frame)
+            frame = self._debug_qref(frame, q_ref, n_prop)
+            cv2.imwrite(out_file, frame)
+
+    def debug_qref_steps(self, frame, q_ref, later_ref, scores, n_prop, path):
+        """save image with evolution of some ref points"""
+        out_file = self.args.output_dir+f'/debug/{path}ref_steps.jpg'
+        if not os.path.exists(out_file):
+            frame = self._debug_frame(frame)
+            _,i = scores[-1, 0,:n_prop].topk(3, dim=0)
+            _,i2 = scores[-1, 0,:n_prop].min(dim=0)
+            idxs = i.view(-1).tolist()+i2.tolist()+[0, n_prop]
+            q_refs = [q_ref[:,idxs]] 
+            q_refs += [ref[:,idxs] for ref in later_ref]
+            for i, q_ref in enumerate(q_refs):
+                frame = self._debug_qref(frame, q_ref, 5, (i+1)/len(q_refs))
+            cv2.imwrite(out_file, frame)
+
+################### visualization of Q-REF

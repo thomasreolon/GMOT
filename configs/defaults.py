@@ -13,11 +13,11 @@ def get_args_parser():
     parser.add_argument('--pretrained', default=None, type=str,             help="model's initializion weights  .pth")
     parser.add_argument('--resume', default=None, type=str,                 help="checkpoint to restart the training from")
 
-
     ## GENERAL
     parser.add_argument('--device', default='cuda',                         help='device to use for training / testing')
     parser.add_argument('--seed', default=42, type=int)
-    parser.add_argument('--det_thresh', default=0.6, type=float)
+    parser.add_argument('--det_thresh', default=0.6, type=float,            help='object detected if score > det_thres')
+    parser.add_argument('--keep_for', default=20, type=int,                 help='keep queries in memory for min X frames')
 
     # * Training settings
     parser.add_argument('--meta_arch', default='gmot', type=str,            help="model architecture to be used")

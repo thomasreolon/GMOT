@@ -22,9 +22,9 @@ import util.multiprocess as utils
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
-                    device: torch.device, epoch: int, args: dict):
+                    device: torch.device, epoch: int, args: dict, debug:str):
 
-    max_norm, debug, out_d = args.clip_max_norm, args.debug, args.output_dir
+    max_norm, out_d = args.clip_max_norm,  args.output_dir
     model.train()
     criterion.train()
 
@@ -38,7 +38,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         gc.collect(); torch.cuda.empty_cache()
 
         # Sequence of 5 frames from the same video (show GT for debugging)
-        if debug and 'gt_visualize.jpg' not in os.listdir(out_d+'/debug'):
+        if debug and os.path.exists(out_d+'/debug/gt_visualize.jpg'):
             os.makedirs(args.output_dir+'/debug/', exist_ok=True)
             imgs = data_dict['imgs']
             concat = torch.cat(imgs, dim=1)
@@ -53,11 +53,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     concat[y1-2:y2+2, x1-2:x2+2] = 1
                     concat[y1:y2, x1:x2] = tmp
             concat = cv2.resize(concat, (400, 1300))
+            concat = (concat/4+0.4) # normalize
+            concat = np.uint8(255*(concat-concat.min())/(concat.max()-concat.min())) # to 255 range
             cv2.imwrite(out_d+'/debug/gt_visualize.jpg', concat)
 
         # Forward
         data_dict = utils.data_dict_to_cuda(data_dict, device)
-        outputs = model(data_dict)
+        outputs = model(data_dict, debug=debug)
 
         # Compute Loss
         loss_dict = criterion(outputs, data_dict)

@@ -3,13 +3,13 @@ from .gaussian_embedd import GaussianEmbedder
 from .sine_embedd import SinCosEmbedder
 from .embedders import ConcatPos, SumPos
 
-def get_position_type(name, size):
+def get_position_type(name, size, keep_for):
     "type of position embedding to be used embedding (sine, others)"
 
     if 'sin' in name:
         return SinCosEmbedder(size)
     elif 'gauss' in name:
-        return GaussianEmbedder(size)
+        return GaussianEmbedder(size, keep_for)
     elif 'sinv2' in name:
         return None
     else:
@@ -36,22 +36,22 @@ class GeneralPositionEmbedder(nn.Module):
         # option to remove embedd from query
         ## ? cat_sin_sinv2 ?
 
-        self.embedder = get_position_type(args.position_embedding, pos_embedd_size)
+        self.embedder = get_position_type(args.position_embedding, pos_embedd_size, args.keep_for)
         self.fuser = get_fuser(args.position_embedding, args.embedd_dim, pos_embedd_size)
 
-    def forward(self, multiscale_img_feats, q1, q2, q1_ref, q2_ref):
+    def forward(self, multiscale_img_feats, q1, q2, q1_ref, q2_ref, confidences):
         
-        q1 = self.make_queries(q1, q1_ref)
-        q2 = self.make_queries(q2, q2_ref)
+        q1 = self.make_queries(q1, q1_ref, confidences)
+        q2 = self.make_queries(q2, q2_ref, None)
         multiscale_img_feats = self.make_features(multiscale_img_feats)
 
         return multiscale_img_feats, q1, q2
 
-    def make_queries(self, q, q_ref):
+    def make_queries(self, q, q_ref, confidences):
         if q is None: return None
 
         b,n,c = q.shape
-        q_pos = self.embedder.get_q_pos(q_ref.view(b*n, 4))
+        q_pos = self.embedder.get_q_pos(q_ref.view(b*n, 4), confidences)#TODO: add strength parameter which depends on number of lives
         q = self.fuser(q.view(b*n, -1), q_pos)
         return q.view(b,n,c)
 

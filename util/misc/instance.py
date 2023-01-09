@@ -219,7 +219,7 @@ class TrackInstances(Instances):
         self._fields['score'] = torch.cat((self.score, torch.zeros(n)), dim=0)
         self._fields['gt_idx'] = torch.cat((self.gt_idx, -torch.ones(n)), dim=0).long()
         self._fields['obj_idx'] = torch.cat((self.obj_idx, -torch.ones(n)), dim=0).long()
-        self._fields['lives'] = torch.cat((self.lives, torch.zeros(n)), dim=0)
+        self._fields['lives'] = torch.cat((self.lives, torch.zeros(n)), dim=0).int()
         
     def drop_miss(self):
         # possible detections
@@ -234,7 +234,7 @@ class TrackInstances(Instances):
         old_tracks = self.lives > 0
 
         # update
-        self.lives[good_score | assigned] = self.__dict__['keep_for']
+        self.lives[good_score | assigned] = (self.__dict__['keep_for'] * self.score).int()[good_score | assigned]
         keep = good_score | assigned | old_tracks
         for k in self._fields:
             self._fields[k] = self._fields[k][keep]

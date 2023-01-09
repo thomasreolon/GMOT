@@ -31,7 +31,7 @@ class SinCosEmbedder(torch.nn.Module):
 
         # return B,C=size,H,W
 
-    def get_q_pos(self, ref_pts, img_shape=(800,1200)):
+    def get_q_pos(self, ref_pts, confidences, img_shape=(800,1200)):
         size = self.size //2
         
         dim_t = torch.arange(size, dtype=torch.float32)
