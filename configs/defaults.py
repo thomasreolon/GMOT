@@ -17,6 +17,7 @@ def get_args_parser():
     ## GENERAL
     parser.add_argument('--device', default='cuda',                         help='device to use for training / testing')
     parser.add_argument('--seed', default=42, type=int)
+    parser.add_argument('--det_thresh', default=0.6, type=float)
 
     # * Training settings
     parser.add_argument('--meta_arch', default='gmot', type=str,            help="model architecture to be used")

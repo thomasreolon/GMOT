@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from util.misc import CheckpointFunction
+from util.misc.instance import TrackInstances
 
 # from util.misc import (NestedTensor, nested_tensor_from_tensor_list,
 #                        accuracy, get_world_size, interpolate, get_rank,
@@ -49,31 +50,27 @@ class GMOT(torch.nn.Module):
             self.ref_pts = nn.Embedding(args.num_queries, 4)
             self.q_embed = nn.Embedding(args.num_queries, hidden_dim)
 
-        self.head = nn.Sequential(
-            nn.Linear(hidden_dim, 1024),
-            nn.LeakyReLU(),
-            nn.Linear(1024, 5)  # [ is_obj, x, y, w, h ]
-        )
-
 
     def forward(self, data):
-        assert data['imgs'][0].shape[0] == 1, "only BatchSize=1 is supported now.."
-        
+        """
+            data['imgs']         = list_of_CHW_tensors  --> [torch.rand(3,256,256), torch.rand(3,256,256), ...]
+            data['gt_instances'] = list_of_gt_instances  --> [inst1, inst2, ...]     , with i containing (boxes, obj_ids)
+            data['exemplar']     = list_of_chw_tensors  --> [torch.rand(3,64,64)]
+        """
+
         # initially no tracks
         outputs = []
-        track_instances = None
-        exemplars = data['exemplar']
+        track_instances = TrackInstances(self.args.embedd_dim, self.args.det_thresh)
+        exemplars = torch.stack(data['exemplar'][:1]) # TODO: support multiple exemplars?
         
-        # noise the ground truth and add it as queries to help the network learn later
-        noised_gt = None
-        if 'gt_instances' in data and data['gt_instances'] is not None:
-            noised_gt = self.noise_gt(data['gt_instances'])
-
-        for frame in data['imgs']:
+        # iterate though all frames
+        for frame, gt in zip(data['imgs'], data['gt_instances']):
+            noised_gt = self.noise_gt(gt) # noise the ground truth and add it as queries to help the network learn later
             # checkpointed forward pass
-            output, track_instances = self._forward_frame(frame, exemplars, noised_gt, track_instances)
+            output, track_instances = self._forward_frame(frame.unsqueeze(0), exemplars, noised_gt, track_instances)
+            self.criterion.postprocess(output, track_instances, gt) #in learning.py
             outputs.append(output)
-            exemplars = exemplars ##### maybe update
+            # exemplars = exemplars ##### TODO: maybe update
 
         return outputs
 
@@ -92,7 +89,8 @@ class GMOT(torch.nn.Module):
             exe_features, exe_masks = self.backbone(*self.prebk(exemplar))
 
             # extract multi scale features from image [[B,C,H1,W1],[B,C,H2,W2],..]
-            img_features, img_masks = self.backbone(*self.prebk(frame))
+            frame, mask = self.prebk(frame)
+            img_features, img_masks = self.backbone(frame, mask)
 
             # share information between exemplar & input frame
             # returns img_feat[[B,C,H1,W1],[B,C,H2,W2],..]   and    queries positions [[xywh],[xywh],[xywh],...]
@@ -107,12 +105,11 @@ class GMOT(torch.nn.Module):
             dict_outputs['input_hs'] = q_queries
 
             # TODO: change how ref_pts are updated
-            hs, refs = self.decoder(img_features, add_keys, q_queries, q_ref, attn_mask)
+            print(q_ref.shape)
+            hs, isobj, coord = self.decoder(img_features, add_keys, q_queries, q_ref, attn_mask, img_masks)
             dict_outputs['output_hs'] = hs
-
-            predictions = self.head(hs)
-            dict_outputs['is_object'] = predictions[:,0]
-            dict_outputs['position']  = predictions[:,1:5]
+            dict_outputs['is_object'] = isobj
+            dict_outputs['position']  = coord
 
             return [v for _,v in dict_outputs.items()]
 
@@ -120,53 +117,50 @@ class GMOT(torch.nn.Module):
         return dict_outputs, track_instances
 
     def update_track_instances(self, img_features, q_prop_refp, track_instances, noised_gt):
-        # TODO: to support multi batch size ->
-        ##          add padding queries
-        ##          set attn_mask = true for padding queries
 
         # queries to detect new tracks
         b = img_features[0].shape[0]
         if q_prop_refp is None:
-            q_prop_emb  = self.q_embed.weight.data.unsqueeze(0).expand(b,-1,-1)
-            q_prop_refp = self.ref_pts.weight.data.unsqueeze(0).expand(b,-1,-1)
+            q_prop_emb  = self.q_embed.weight.data
+            q_prop_refp = self.ref_pts.weight.data
         else:
-            q_prop_emb  = self.make_q_from_ref(q_prop_refp, img_features)
+            q_prop_emb  = self.make_q_from_ref(q_prop_refp[0], img_features)
 
         # queries used to help learning
         if noised_gt is not None:
             q_gt_refp = noised_gt
             q_gt_emb  = self.make_q_from_ref(q_gt_refp, img_features)
-            n_gt      = q_gt_refp.shape[-2]
+            n_gt      = q_gt_refp.shape[0]
         else:
-            q_gt_refp = torch.zeros((b, 0, 4))
-            q_gt_emb  = torch.zeros((b, 0, q_prop_emb.shape[2]))
+            q_gt_refp = torch.zeros((0, 4))
+            q_gt_emb  = torch.zeros((0, q_prop_emb.shape[1]))
             n_gt      = 0
 
         
         # add queries to detect new tracks to track_instances
-        # track_instances.add_new(q_prop_emb, q_prop_refp)
+        track_instances.add_new(q_prop_emb, q_prop_refp)
 
         # final queries for the decoder
-        # q_queries = torch.cat((track_instances.q_emb, q_gt_emb), dim=-2)   # B,N,256
-        # q_ref_pts = torch.cat((track_instances.q_ref, q_gt_refp), dim=-2)  # B,N,4
-        q_queries = torch.cat((q_prop_emb, q_gt_emb), dim=-2)   # B,N,256 ##DEBUG
-        q_ref_pts = torch.cat((q_prop_refp, q_gt_refp), dim=-2)  # B,N,4
+        q_queries = torch.cat((track_instances.q_emb, q_gt_emb), dim=-2)   # N,256
+        q_ref_pts = torch.cat((track_instances.q_ref, q_gt_refp), dim=-2)  # N,4
+
         n_tot = q_queries.shape[-2]
         attn_mask = torch.zeros((n_tot, n_tot), dtype=bool, device=q_queries.device)
         attn_mask[:n_gt, n_gt:] = True
 
-        return q_queries, q_ref_pts, attn_mask
+        return q_queries.unsqueeze(0), q_ref_pts.unsqueeze(0), attn_mask
 
     def make_q_from_ref(self, ref_pts, img_features):
-        b_idxs = sum([[i]*ref_pts.shape[1] for i in range(ref_pts.shape[0])], [])
         queries = []
         for f_scale in img_features:
-            b,c,h,w = f_scale.shape
-            points = (ref_pts[:,:,:2] * torch.tensor([[[w,h]]])).int().view(-1, 2)
-            q = img_features[b_idxs, :, points[:,1], points[:,0]]
-            queries.append(q.view(b,ref_pts.shape[1], c))
+            _,_,h,w = f_scale.shape
+            points = (ref_pts[:,:2] * torch.tensor([[w,h]])).long().view(-1, 2)
+            q = f_scale[0, :, points[:,1], points[:,0]]
+            queries.append(q.T)  # N, C
         queries = torch.stack(queries, dim=0).mean(dim=0)
         return queries
 
-
+    def noise_gt(self, gt):
+        boxes = gt.boxes
+        return boxes + torch.rand_like(boxes)*0.08 -0.04
 

@@ -30,24 +30,24 @@ from util.misc import box_xyxy_to_cxcywh
 
 
 def make_imgdataset_transforms(args, image_set):
-    normalize = T.MotCompose([
-        T.MotToTensor(),
-        T.MotNormalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    normalize = MotCompose([
+        MotToTensor(),
+        MotNormalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
     scales = [608, 640, 672, 704, 736, 768, 800, 832, 864]
 
     if image_set == 'train':
-        return T.MotCompose([
-            T.MotRandomHorizontalFlip(),
-            T.MotRandomResize(scales, max_size=1555),
-            T.MotRandomShiftExtender(args.sample_interval,args.sampler_lengths[0]),
-            T.MOTHSV(),
+        return MotCompose([
+            MotRandomHorizontalFlip(),
+            MotRandomResize(scales, max_size=1555),
+            MotRandomShiftExtender(args.sample_interval,args.sampler_lengths[0]),
+            MOTHSV(),
             normalize,
         ])
     else:
-        return T.MotCompose([
-            T.MotRandomShiftExtender(args.sample_interval,args.sampler_lengths[0]),
-            T.MotRandomResize([800], max_size=1333),
+        return MotCompose([
+            MotRandomShiftExtender(args.sample_interval,args.sampler_lengths[0]),
+            MotRandomResize([800], max_size=1333),
             normalize,
         ])
 
@@ -55,30 +55,30 @@ def make_imgdataset_transforms(args, image_set):
 
 def make_viddataset_transforms(args, image_set):
 
-    normalize = T.MotCompose([
-        T.MotToTensor(),
-        T.MotNormalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    normalize = MotCompose([
+        MotToTensor(),
+        MotNormalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
     scales = [608, 640, 672, 704, 736, 768, 800, 832, 864, 896, 928, 960, 992]
 
     if image_set == 'train':
-        return T.MotCompose([
-            T.MotRandomHorizontalFlip(),
-            T.MotRandomSelect(
-                T.MotRandomResize(scales, max_size=1536),
-                T.MotCompose([
-                    T.MotRandomResize([800, 1000, 1200]),
-                    T.FixedMotRandomCrop(800, 1200),
-                    T.MotRandomResize(scales, max_size=1536),
+        return MotCompose([
+            MotRandomHorizontalFlip(),
+            MotRandomSelect(
+                MotRandomResize(scales, max_size=1536),
+                MotCompose([
+                    MotRandomResize([800, 1000, 1200]),
+                    FixedMotRandomCrop(800, 1200),
+                    MotRandomResize(scales, max_size=1536),
                 ])
             ),
-            T.MOTHSV(),
+            MOTHSV(),
             normalize,
         ])
 
     else:
-        return T.MotCompose([
-            T.MotRandomResize([800], max_size=1333),
+        return MotCompose([
+            MotRandomResize([800], max_size=1333),
             normalize,
         ])
 

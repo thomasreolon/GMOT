@@ -7,7 +7,7 @@ import torch
 import torchvision
 from torch.utils.data import Dataset
 
-import datasets.transforms as make_imgdataset_transforms
+from datasets.transforms import make_imgdataset_transforms
 from util.misc import Instances
 
 
@@ -20,12 +20,12 @@ class FSCDataset(Dataset):
         self.transform = transform
 
         # folder with images
-        self.path_imgs = args.fscd_path+'/images_384_VarV2/'
+        self.path_imgs = args.fscd_dir+'/images_384_VarV2/'
 
         # get data from json
-        det2 = json.load(open(args.fscd_path+'/instances_test.json', 'r'))      # used for train
-        det = json.load(open(args.fscd_path+'/instances_val.json', 'r'))        # used for test/val
-        all_ann = json.load(open(args.fscd_path+'/annotation_FSC147_384.json', 'r'))
+        det2 = json.load(open(args.fscd_dir+'/instances_test.json', 'r'))      # used for train
+        det = json.load(open(args.fscd_dir+'/instances_val.json', 'r'))        # used for test/val
+        all_ann = json.load(open(args.fscd_dir+'/annotation_FSC147_384.json', 'r'))
 
         # select train/test  (a bit ugly cause we have GT only for some images)
         if args.small_ds:
@@ -112,17 +112,17 @@ class FSCDataset(Dataset):
         bb = (bb.view(2,2) * torch.tensor([img.shape[2],img.shape[1]]).view(1,2)).flatten()  # coords in img
         bb = torch.cat((bb[:2]-bb[2:]/2, bb[:2]+bb[2:]/2)).int()               # x1y1x2y2
         bb = bb.clamp(min=0)
-        patch = img[:, bb[1]:bb[3], bb[0]:bb[2]]
+        crop = img[:, bb[1]:bb[3], bb[0]:bb[2]]
 
-        # pad val
-        max_dim = torch.tensor([max(*patch.shape[1:])],dtype=float)
-        if max_dim==0: ### escape in case of errors =,)
+        # check goodness of patch
+        max_dim = torch.tensor([max(*crop.shape[1:])],dtype=float)
+        if len(target['boxes'])==p+1:
+            # emergence
+            crop = img[:, bb[1]:bb[1]+4, bb[0]:bb[0]+4]
+        elif max_dim==0:
+            # get next box in case of errors
             return self.get_exemplar(img, target, p+1)
-        pad_size = 2**(int(torch.log2(max_dim).item()) +1)
-        pad_size = max(pad_size, 64)
-        paddings = ((pad_size-patch.shape[2])//2, (pad_size-patch.shape[1])//2, pad_size-patch.shape[2]-(pad_size-patch.shape[2])//2, pad_size-patch.shape[1]-(pad_size-patch.shape[1])//2)
-        img =  torchvision.transforms.functional.pad(patch, paddings)
-        return [img.unsqueeze(0)]
+        return [crop]
 
     def set_epoch(self, epoch):
         self.current_epoch = epoch
@@ -144,7 +144,7 @@ class FSCDataset(Dataset):
 
 
 def build_fscd(image_set, args):
-    root = pathlib.Path(args.fscd_path)
+    root = pathlib.Path(args.fscd_dir)
     assert root.exists(), f'provided FSCD path {root} does not exist'
     transform = make_imgdataset_transforms(args, image_set)
     

@@ -9,7 +9,7 @@ import util.multiprocess as distrib
 from util.engine import train_one_epoch
 
 from datasets import build_dataset
-from models import build_model
+from models.gmot import build as build_model
 from models.learning import build_learner
 
 
@@ -24,7 +24,7 @@ def main(args):
     model      = build_model(args)                      # transformer tracker
     criterion, optimizer, lr_scheduler \
                = build_learner(args, model)             # loss function: models_outputs, ground_truth --> scalar
-    tr_dataset = build_dataset(args)                    # dict(imgs, gt_instances, exemplar) 
+    tr_dataset = build_dataset('train', args)                    # dict(imgs, gt_instances, exemplar) 
 
     # Distribute Model & Dataset (if args.distributed==True)
     sampler, data_loader_train, model_without_ddp, model = distrib.make_distributed(args, model, tr_dataset)

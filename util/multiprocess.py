@@ -618,7 +618,7 @@ def make_distributed(args, model, dataset):
 
     # DataLoader
     batch_sampler_train = torch.utils.data.BatchSampler(sampler, args.batch_size, drop_last=True)
-    data_loader_train = DataLoader(sampler, batch_sampler=batch_sampler_train,
+    data_loader_train = DataLoader(dataset, batch_sampler=batch_sampler_train,
                                    collate_fn=mot_collate_fn, num_workers=args.num_workers,
                                    pin_memory=True)
     

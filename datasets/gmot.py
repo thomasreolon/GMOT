@@ -132,7 +132,7 @@ class GMOTDataset(Dataset):
         pad_size = max(pad_size, 64)
         paddings = ((pad_size-patch.shape[2])//2, (pad_size-patch.shape[1])//2, pad_size-patch.shape[2]-(pad_size-patch.shape[2])//2, pad_size-patch.shape[1]-(pad_size-patch.shape[1])//2)
         img =  torchvision.transforms.functional.pad(patch, paddings)
-        return [img.unsqueeze(0)]
+        return [img]
 
 
     def _pre_single_frame(self, vid, idx):

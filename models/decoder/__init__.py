@@ -10,8 +10,6 @@ def get_main_decoder(name, args):
         raise NotImplementedError()
 
 
-
-
 class GeneralDecoder(nn.Module):
     def __init__(self, args):
         super().__init__()

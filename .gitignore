@@ -1,7 +1,7 @@
 outputs
 **.pth
-.args
-
+configs/*.tmp
+configs/*.args
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

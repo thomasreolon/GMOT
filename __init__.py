@@ -15,7 +15,8 @@ def test_model_forward():
     args = get_args_parser().parse_args()
     model = build(args)
 
-    model({'imgs':torch.rand(5,1,3,128,128), 'exemplar':torch.rand(1,3,56,56)})
+    outs = model({'imgs':torch.rand(5,1,3,128,128), 'exemplar':torch.rand(1,3,56,56)})
+    print([(k,v.shape) for k,v in outs[0].items()])
 
 def test_position_embedds():
     print('\n\n> testing pos embedding')

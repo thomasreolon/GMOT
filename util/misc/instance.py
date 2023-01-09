@@ -197,3 +197,46 @@ class Instances:
 
     __repr__ = __str__
 
+
+class TrackInstances(Instances):
+    def __init__(self, embedd_dim, conf_thresh=0.5, keep_for=20, **kwargs: Any):
+        super().__init__((1,1), **kwargs)
+        self.__dict__['conf_thresh'] = conf_thresh
+        self.__dict__['keep_for'] = keep_for+1
+    
+        self.q_emb = torch.zeros(0,embedd_dim)
+        self.q_ref = torch.zeros(0,4)
+        self.score = torch.zeros(0)
+        self.gt_idx = torch.zeros(0)
+        self.obj_idx = torch.zeros(0)
+        self.lives = torch.zeros(0)
+
+    def add_new(self, q_prop_emb, q_prop_refp):
+        n, _ = q_prop_emb.shape
+
+        self._fields['q_emb'] = torch.cat((self.q_emb, q_prop_emb), dim=0)
+        self._fields['q_ref'] = torch.cat((self.q_ref, q_prop_refp), dim=0)
+        self._fields['score'] = torch.cat((self.score, torch.zeros(n)), dim=0)
+        self._fields['gt_idx'] = torch.cat((self.gt_idx, -torch.ones(n)), dim=0).long()
+        self._fields['obj_idx'] = torch.cat((self.obj_idx, -torch.ones(n)), dim=0).long()
+        self._fields['lives'] = torch.cat((self.lives, torch.zeros(n)), dim=0)
+        
+    def drop_miss(self):
+        # possible detections
+        threshold = self.score.mean() + self.score.std()
+        threshold = max(threshold, self.__dict__['conf_thresh'])
+        good_score = self.score > threshold
+
+        # assigned by matcher
+        assigned = self.gt_idx >= 0
+
+        # memory queries
+        old_tracks = self.lives > 0
+
+        # update
+        self.lives[good_score | assigned] = self.__dict__['keep_for']
+        keep = good_score | assigned | old_tracks
+        for k in self._fields:
+            self._fields[k] = self._fields[k][keep]
+
+        self.lives -= 1
