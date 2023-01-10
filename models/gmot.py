@@ -91,6 +91,7 @@ class GMOT(torch.nn.Module):
             frame, mask = self.prebk(frame)
             b_mask = mask if b_mask is None else b_mask[None] | mask
             img_features, img_masks = self.backbone(frame, b_mask)
+            img_features = [torch.zeros_like(i) for i in img_features]##################################
             dict_outputs['img_features'] = img_features
 
             # share information between exemplar & input frame
@@ -109,10 +110,7 @@ class GMOT(torch.nn.Module):
             os.makedirs(self.args.output_dir+'/debug/'+'0/tmp_'.split('/')[-2], exist_ok=True)
             vis.debug_q_similarity(q_queries, img_features, q_ref, 100, '0/tmp_')
 
-
-            input()
             exit()
-
 
             img_features, q_queries, _ = self.posembed(img_features, q_queries, None, q_ref, None, confidence)
             dict_outputs['input_hs'] = q_queries
@@ -140,6 +138,7 @@ class GMOT(torch.nn.Module):
         return coord
 
     def update_track_instances(self, img_features, q_prop_refp, track_instances, noised_gt):
+        # TODO: batchsize=1 is still mandatory (probably 4ever)
 
         # queries to detect new tracks
         if q_prop_refp is None:

@@ -41,17 +41,18 @@ class GeneralPositionEmbedder(nn.Module):
 
     def forward(self, multiscale_img_feats, q1, q2, q1_ref, q2_ref, confidences):
         
-        q1 = self.make_queries(q1, q1_ref, confidences)
-        q2 = self.make_queries(q2, q2_ref, None)
+        img_shape=multiscale_img_feats[0].shape[2:]
+        q1 = self.make_queries(q1, q1_ref, confidences, img_shape)
+        q2 = self.make_queries(q2, q2_ref, None, None)
         multiscale_img_feats = self.make_features(multiscale_img_feats)
 
         return multiscale_img_feats, q1, q2
 
-    def make_queries(self, q, q_ref, confidences):
+    def make_queries(self, q, q_ref, confidences,img_shape):
         if q is None: return None
 
         b,n,c = q.shape
-        q_pos = self.embedder.get_q_pos(q_ref.view(b*n, 4), confidences)#TODO: add strength parameter which depends on number of lives
+        q_pos = self.embedder.get_q_pos(q_ref.view(b*n, 4), confidences=confidences, img_shape=img_shape)
         q = self.fuser(q.view(b*n, -1), q_pos)
         return q.view(b,n,c)
 

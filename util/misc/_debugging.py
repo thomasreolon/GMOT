@@ -6,6 +6,7 @@ import os
 class Visualizer():
     def __init__(self, args) -> None:
         self.args = args
+        os.makedirs(self.args.output_dir+'/debug/', exist_ok=True)
 
     def _debug_frame(self, frame, out_w=400):
         """util to make frame to writable"""
@@ -19,7 +20,6 @@ class Visualizer():
     def visualize_gt(self, data_dict):
         out_d = self.args.output_dir
         if os.path.exists(out_d+'/debug/gt_visualize.jpg'): return
-        os.makedirs(out_d+'/debug/', exist_ok=True)
         
         # image shape
         num_imgs = len(data_dict['imgs']) + 1
@@ -99,13 +99,13 @@ class Visualizer():
                 # similarity = similarity.sigmoid()
                 similarity = similarity.view(3,-1).softmax(dim=1).view(3,similarity.shape[1],-1)
 
-                similarity = (similarity-similarity.min()) / (similarity.max()-similarity.min())               
+                similarity = (similarity-similarity.min()) / (similarity.max()-similarity.min()) 
                 similarity = torch.cat([i for i in similarity], dim=0)[:,:,None].expand(-1,-1,3)
                 similarity = np.uint8(similarity.cpu().numpy()*255)     # h*3, w, 1
                 similarity = cv2.resize(similarity, (w, h))
                 similarity[:,-1:] = similarity[:,-1:].clip(120)         # grey border
                 similarity[[h//3,h*2//3],:] = similarity[[h//3,h*2//3],:].clip(120)   # grey border
-                similarity = self._debug_qref(similarity, q_ref, len(q_emb), 0, 5)
+                similarity = self._debug_qref(similarity, q_ref, 3, 0, 5)
                 imgs.append(similarity)
             frame = np.concatenate(imgs, axis=1)
             cv2.imwrite(out_file, frame)
