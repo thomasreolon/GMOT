@@ -8,7 +8,7 @@ from typing import List
 
 def build_learner(args, model):
     # loss fn
-    criterion = Criterion()
+    criterion = Criterion(args, model)
     model.criterion = criterion
 
     # optimizer
@@ -21,8 +21,9 @@ def build_learner(args, model):
 
 
 class Criterion(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, args, model) -> None:
         super().__init__()
+        self.args = args
 
     def forward(self, outputs, gt_instances):
         pass
@@ -33,14 +34,16 @@ class Criterion(nn.Module):
         ##### Update Already Assigned objidx
         ii, jj = torch.where(track_instances.obj_idx[:, None] == gt_inst.obj_ids[None]) #N,1 - 1,M
         track_instances.gt_idx[ii] = jj
-        track_instances.lives[ii] = 20
         assigned_gt = {int(j) for j in jj}
         assigned_pr = {int(i) for i in ii}
+        debug_assignments = torch.zeros(output['is_object'].shape[2]).int()
+        debug_assignments[ii] = 2
 
         ##### Prediction With Confidence
         num_proposals = len(track_instances)
         obj = output['is_object'][-1,0,:num_proposals,0] # TODO: 0 at dim=1 is an hack 4 batchsize=1
         track_instances.score = obj.sigmoid().clone().detach()
+        debug_assignments[num_proposals:] = 1
         
         ##### Predictions Near a GT
         gt_xy = gt_inst.boxes[None,:,:2]                       # 1, M, 2
@@ -60,10 +63,17 @@ class Criterion(nn.Module):
                 
             track_instances.gt_idx[i]  = j                    # index of ground truth
             track_instances.obj_idx[i] = gt_inst.obj_ids[j]   # object id of the detection in the dataset
-            track_instances.lives[i]   = 20                   # keep query for 20 frames
             assigned_gt.add(j)
             assigned_pr.add(i)
+            debug_assignments[i] = 3
 
+        debug_assignments[output['is_object'][-1,0,:,0]>self.args.det_thresh] += 10
+        
+        output['debug'] = debug_assignments
+        output['matching'] = track_instances.gt_idx
+
+        track_instances.q_ref = output['position'][-1,0,:num_proposals]
+        track_instances.q_emb = output['output_hs'][-1,0,:num_proposals]
         track_instances.drop_miss()
 
 

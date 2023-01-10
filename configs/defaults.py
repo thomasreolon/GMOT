@@ -50,10 +50,10 @@ def get_args_parser():
     parser.add_argument('--embedd_dim', default=256, type=int,              help="Size of the embeddings (num channels)")
     
     # * PreBackbone
-    parser.add_argument('--img_prep', default='padder', type=str,           help="padding, resizing, ...")
+    parser.add_argument('--img_prep', default='padding', type=str,           help="padding, nothing, ...")
 
     # * Backbone
-    parser.add_argument('--backbone', default='revbifpn', type=str,         help="name of the backbone to use")
+    parser.add_argument('--backbone', default='resnet50', type=str,         help="name of the backbone to use")
     parser.add_argument('--num_feature_levels', default=4, type=int,        help='number of feature levels')
 
     # * Mixer

@@ -1,5 +1,6 @@
 import time
 import os
+import shutil
 
 import torch
 
@@ -66,6 +67,7 @@ def main(args):
 if __name__=='__main__':
     args = get_args_parser().parse_args()
     if args.output_dir:
-        os.makedirs(args.output_dir+'/debug', exist_ok=True)
-        if args.debug: os.system(f'rm -r "{args.output_dir}/debug/*"')
+        if args.debug:
+            shutil.rmtree(f'{args.output_dir}/debug', ignore_errors=True)
+        os.makedirs(args.output_dir, exist_ok=True)
     main(args)

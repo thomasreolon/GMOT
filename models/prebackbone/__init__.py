@@ -6,7 +6,7 @@ from .nothing import MinSize
 def get_main_prebackbone(name):
     "This is the type of preprocessing done before the real backbone, can: resize image, add padding to make img divisible by 32, extract some channels in advance, ..."
 
-    if name == 'padder':
+    if name == 'padding':
         return Padder()
     if name == 'nothing':
         return MinSize()

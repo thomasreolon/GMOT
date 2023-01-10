@@ -13,6 +13,9 @@ from .nestedtensor import NestedTensor
 # many functions reganding Boxes =0
 from .boxes import *
 
+# makes infographics to see what the network does
+from ._debugging import Visualizer
+
 # other
 from ._other import (
     set_seed,           # set random seed
