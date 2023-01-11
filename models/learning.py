@@ -6,6 +6,8 @@ import torch.nn.functional as F
 from torch import nn, Tensor
 from typing import List
 
+from ._loss import loss_fn_getter
+
 def build_learner(args, model):
     # loss fn
     criterion = Criterion(args, model)
@@ -24,9 +26,19 @@ class Criterion(nn.Module):
     def __init__(self, args, model) -> None:
         super().__init__()
         self.args = args
+        self.losses = {
+            'bbox_position':1,     # position of bounding boxes (center)
+            'bbox_size':1,         # wh of bounding boxes (iou_loss)
+            'is_object':1,         # if the query is visualizing something 
+
+        } # TODO: select losses as args parameter
 
     def forward(self, outputs, gt_instances):
-        pass
+        dict_losses = {}
+        for loss, multiplier in self.losses.items():
+            loss_fn = loss_fn_getter(loss)
+            dict_losses[loss] = multiplier * loss_fn(outputs, gt_instances)
+        return dict_losses
 
     @torch.no_grad()
     def postprocess(self, output, track_instances, gt_inst):
