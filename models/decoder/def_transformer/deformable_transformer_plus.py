@@ -322,11 +322,6 @@ class DeformableTransformerDecoderLayer(nn.Module):
             self.dropout5 = nn.Dropout(dropout)
             self.norm4 = nn.LayerNorm(d_model)
 
-        if self_cross:
-            print('Training with Self-Cross Attention.')
-        else:
-            print('Training with Cross-Self Attention.')
-
     @staticmethod
     def with_pos_embed(tensor, pos):
         return tensor if pos is None else tensor + pos
@@ -389,10 +384,11 @@ class DeformableTransformerDecoderLayer(nn.Module):
 
 
 def pos2posemb(pos, num_pos_feats=64, temperature=10000):
+    return None
     scale = 2 * math.pi
     pos = pos * scale
     dim_t = torch.arange(num_pos_feats, dtype=torch.float32, device=pos.device)
-    dim_t = temperature ** (2 * (dim_t // 2) / num_pos_feats)
+    dim_t = temperature ** (2 * (dim_t.div(2,rounding_mode='trunc')) / num_pos_feats)
     posemb = pos[..., None] / dim_t
     posemb = torch.stack((posemb[..., 0::2].sin(), posemb[..., 1::2].cos()), dim=-1).flatten(-3)
     return posemb
@@ -422,7 +418,7 @@ class DeformableTransformerDecoder(nn.Module):
                 assert reference_points.shape[-1] == 2
                 reference_points_input = reference_points[:, :, None] * src_valid_ratios[:, None]
             query_pos = pos2posemb(reference_points)
-            output = layer(output, query_pos, reference_points_input, src, src_spatial_shapes,
+            output = layer(output, None, reference_points_input, src, src_spatial_shapes,
                            src_level_start_index, src_padding_mask, mem_bank, mem_bank_pad_mask, attn_mask)
 
             # hack implementation for iterative bounding box refinement

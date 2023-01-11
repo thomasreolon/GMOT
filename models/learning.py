@@ -53,7 +53,7 @@ class Criterion(nn.Module):
         dist = ((xy - gt_xy)**2).sum(dim=-1) # N,M
         n,m = dist.shape
         _,idxs = torch.sort(dist.view(-1))
-        ii = (idxs // m).tolist()
+        ii = idxs.div(m, rounding_mode='trunc').tolist()
         jj = (idxs % m).tolist()
 
         # assignments

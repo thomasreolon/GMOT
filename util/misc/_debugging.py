@@ -11,7 +11,7 @@ class Visualizer():
     def _debug_frame(self, frame, out_w=400):
         """util to make frame to writable"""
         if len(frame.shape) == 4: frame = frame[0]
-        frame = np.ascontiguousarray(frame.clone().permute(1,2,0).numpy() [:,:,::-1]) /4+0.4 # frame in BGR
+        frame = np.ascontiguousarray(frame.clone().cpu().permute(1,2,0).numpy() [:,:,::-1]) /4+0.4 # frame in BGR
         frame = np.uint8(255*(frame-frame.min())/(frame.max()-frame.min()))
         h,w,_ = frame.shape
         return cv2.resize(frame, (out_w,int(out_w*h/w)))
@@ -19,8 +19,7 @@ class Visualizer():
     @torch.no_grad()
     def visualize_gt(self, data_dict):
         out_d = self.args.output_dir
-        if os.path.exists(out_d+'/debug/gt_visualize.jpg'): return
-        
+        if os.path.exists(out_d+'/debug/gt_visualize.jpg'): return        
         # image shape
         num_imgs = len(data_dict['imgs']) + 1
         num_rows = int(np.sqrt(num_imgs))
@@ -34,8 +33,8 @@ class Visualizer():
             def clean(x,X): return int(max(0,min(x, X-1)))
             for box in gt.boxes:
                 box = (box.view(2,2) * torch.tensor([W, H], device=box.device).view(1,2)).int()
-                x1,x2 = box[0,0] - box[1,0]//2, box[0,0] + box[1,0]//2
-                y1,y2 = box[0,1] - box[1,1]//2, box[0,1] + box[1,1]//2
+                x1,x2 = box[0,0] - box[1,0].div(2,rounding_mode='trunc'), box[0,0] + box[1,0].div(2,rounding_mode='trunc')
+                y1,y2 = box[0,1] - box[1,1].div(2,rounding_mode='trunc'), box[0,1] + box[1,1].div(2,rounding_mode='trunc')
                 x1,x2,y1,y2 = clean(x1,W),clean(x2,W),clean(y1,H),clean(y2,H)
                 tmp = img[y1:y2, x1:x2].copy()
                 img[y1-2:y2+2, x1-2:x2+2] = (255,0,255)
@@ -44,7 +43,8 @@ class Visualizer():
         imgs += [200*np.ones_like(img) for _ in range(whites_to_add)]
 
         # add exemplar
-        exemplar = self._debug_frame(data_dict['exemplar'][0], data_dict['exemplar'][0].shape[2])
+        exe_scale = int(data_dict['exemplar'][0].shape[2] * 600 / data_dict['imgs'][0].shape[2])
+        exemplar = self._debug_frame(data_dict['exemplar'][0], exe_scale)
         h1,h2 = H//3, H//3 +exemplar.shape[0]
         w1,w2 = W//3, W//3 +exemplar.shape[1]
         imgs[-1][h1:h2, w1:w2] = exemplar
@@ -65,17 +65,17 @@ class Visualizer():
 
         # info needed on that frame
         frame = frames[num].unsqueeze(0)
-        q_ref = outputs[num]['q_ref']
-        coord = outputs[num]['position']
-        isobj = outputs[num]['is_object']
+        q_ref = outputs[num]['q_ref'].cpu()
+        coord = outputs[num]['position'].cpu()
+        isobj = outputs[num]['is_object'].cpu()
         n_prop = q_ref.shape[1] - len(gt[num])
 
-        assignments = outputs[num]['debug']
-        matching = outputs[num]['matching']
+        assignments = outputs[num]['debug'].cpu()
+        matching = outputs[num]['matching'].cpu()
         gt_boxes = gt[num].boxes
 
-        queries = outputs[num]['input_hs']
-        img_features = outputs[num]['img_features']
+        queries = outputs[num]['input_hs'].cpu()
+        img_features = [i.cpu() for i in outputs[num]['img_features_pos']]
 
         # helper functions for graphics
         self.debug_q_similarity(queries, img_features, q_ref, n_prop, path)
@@ -96,10 +96,15 @@ class Visualizer():
 
             for img in img_features: # 1,256,h,w
                 similarity = (q_emb @ img[0].transpose(0,1)).transpose(0,1).contiguous()  # 3,h,w
+                idx = similarity.flatten(1).max(dim=(1))[1]
+                i,j = torch.div(idx,similarity.shape[-1], rounding_mode='trunc').long(), (idx%similarity.shape[-1]).long()
+
                 # similarity = similarity.sigmoid()
                 similarity = similarity.view(3,-1).softmax(dim=1).view(3,similarity.shape[1],-1)
 
-                similarity = (similarity-similarity.min()) / (similarity.max()-similarity.min()) 
+                similarity = (similarity-similarity.min()) / (similarity.max()-similarity.min())
+                for d1,d2 in [(0,0),(1,1),(1,-1),(-1,1),(-1,-1)]:
+                    similarity[[0,1,2], (i+d1).clamp(0,similarity.shape[1]-1), (j+d2).clamp(0,similarity.shape[2]-1)] = 1 
                 similarity = torch.cat([i for i in similarity], dim=0)[:,:,None].expand(-1,-1,3)
                 similarity = np.uint8(similarity.cpu().numpy()*255)     # h*3, w, 1
                 similarity = cv2.resize(similarity, (w, h))
@@ -188,13 +193,14 @@ class Visualizer():
         q_ref = q_ref[0,:,:2]
         H,W,_ = frame.shape
         c2 = np.array([255,100,80])  # blue border
+        def clean(x,X): return int(max(0, min(X-1, x)))
         for i, (w, h) in enumerate(q_ref):
             color = np.array([80,250,90] if i<n_prop else [250,80,255]) # green prop;  purple gt
             w = int(w*W)
             h = int(h*H)
-            tmp = frame[h-s+1:h+s,w-s+1:w+s].copy()
-            frame[h-s:h+s+1,w-s:w+s+1] = ((0.75-opacity/4)*frame[h-s:h+s+1,w-s:w+s+1].astype(float) + c2*(.75+opacity/4)).astype(np.uint8)
-            frame[h-s+1:h+s,w-s+1:w+s] = ((1-opacity)*tmp.astype(float) + color*opacity).astype(np.uint8)
+            tmp = frame[max(0,h-s)+1:h+s,max(0,w-s)+1:w+s].copy()
+            frame[max(h-s,0):h+s+1,max(0,w-s):w+s+1] = ((0.75-opacity/4)*frame[max(h-s,0):h+s+1,max(0,w-s):w+s+1].astype(float) + c2*(.75+opacity/4)).astype(np.uint8)
+            frame[max(h-s,0)+1:h+s,max(0,w-s)+1:w+s] = ((1-opacity)*tmp.astype(float) + color*opacity).astype(np.uint8)
         return frame
 
 

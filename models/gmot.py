@@ -58,7 +58,7 @@ class GMOT(torch.nn.Module):
         # initially no tracks
         outputs = []
         if 'masks' not in data: data['masks'] = [None for _ in range(len(data['imgs']))]
-        track_instances = TrackInstances(self.args.embedd_dim, self.args.det_thresh, self.args.keep_for)
+        track_instances = TrackInstances(self.args.embedd_dim, self.args.det_thresh, self.args.keep_for).to(data['imgs'][0].device)
         exemplars = torch.stack(data['exemplar'][:1]) # TODO: support multiple exemplars?
         
         # iterate though all frames
@@ -91,7 +91,6 @@ class GMOT(torch.nn.Module):
             frame, mask = self.prebk(frame)
             b_mask = mask if b_mask is None else b_mask[None] | mask
             img_features, img_masks = self.backbone(frame, b_mask)
-            img_features = [torch.zeros_like(i) for i in img_features]##################################
             dict_outputs['img_features'] = img_features
 
             # share information between exemplar & input frame
@@ -104,16 +103,9 @@ class GMOT(torch.nn.Module):
                 self.update_track_instances(img_features, q_prop_refp, track_instances, noised_gt)
             dict_outputs['q_ref'] = q_ref
 
-
-            from util.misc import Visualizer
-            vis = Visualizer(self.args)
-            os.makedirs(self.args.output_dir+'/debug/'+'0/tmp_'.split('/')[-2], exist_ok=True)
-            vis.debug_q_similarity(q_queries, img_features, q_ref, 100, '0/tmp_')
-
-            exit()
-
             img_features, q_queries, _ = self.posembed(img_features, q_queries, None, q_ref, None, confidence)
             dict_outputs['input_hs'] = q_queries
+            dict_outputs['img_features_pos'] = img_features
 
             # TODO: change how ref_pts are updated
             hs, isobj, coord = self.decoder(img_features, add_keys, q_queries, q_ref, attn_mask, img_masks)
@@ -170,7 +162,7 @@ class GMOT(torch.nn.Module):
         attn_mask[:n_gt, n_gt:] = True
 
         # confidences for position embedding
-        gt_conf = torch.ones(n_gt) * self.args.keep_for # max confidence
+        gt_conf = torch.ones(n_gt, device=q_queries.device) * self.args.keep_for # max confidence
         confidences = torch.cat((track_instances.lives, gt_conf), dim=-1)
 
         return q_queries.unsqueeze(0), q_ref_pts.unsqueeze(0), confidences, attn_mask
@@ -179,7 +171,7 @@ class GMOT(torch.nn.Module):
         queries = []
         for f_scale in img_features:
             _,_,h,w = f_scale.shape
-            points = (ref_pts[:,:2] * torch.tensor([[w,h]])).long().view(-1, 2)
+            points = (ref_pts[:,:2] * torch.tensor([[w,h]],device=ref_pts.device)).long().view(-1, 2)
             q = f_scale[0, :, points[:,1], points[:,0]]
             queries.append(q.T)  # N, C
         queries = torch.stack(queries, dim=0).mean(dim=0)

@@ -34,8 +34,10 @@ def main(args):
     utils.load_checkpoint(args, model_without_ddp, optimizer, lr_scheduler)
 
     # Training Loop
+    model = model.to(device)
     start_time = time.time()
     debug_epochs = {args.start_epoch, (args.epochs+args.start_epoch)//2, args.epochs-1} # when save info images
+    if args.debug: print('Creating Visualizations. . . ')
     for epoch in range(args.start_epoch, args.epochs):
         start_e_time = time.time()
         if args.distributed:

@@ -1,6 +1,16 @@
 import torch
 
+"""
 
+def pos2posemb(pos, num_pos_feats=64, temperature=10000):
+    scale = 2 * math.pi
+    pos = pos * scale
+    dim_t = torch.arange(num_pos_feats, dtype=torch.float32, device=pos.device)
+    dim_t = temperature ** (2 * (dim_t // 2) / num_pos_feats)
+    posemb = pos[..., None] / dim_t
+    posemb = torch.stack((posemb[..., 0::2].sin(), posemb[..., 1::2].cos()), dim=-1).flatten(-3)
+    return posemb
+"""
 
 class SinCosEmbedder(torch.nn.Module):
 

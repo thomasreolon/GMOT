@@ -42,7 +42,8 @@ def make_imgdataset_transforms(args, image_set):
             MotRandomResize(scales, max_size=1555),
             MotRandomShiftExtender(args.sample_interval,args.sampler_lengths[0]),
             MOTHSV(),
-            normalize,
+            normalize,  # also scales from HW to [01]
+            MOTCleanGT(),
         ])
     else:
         return MotCompose([
@@ -372,6 +373,33 @@ class MOTHSV:
             img_hsv[..., 2] = np.clip(img_hsv[..., 2] + hsv_augs[2], 0, 255)
 
             imgs[i] = cv2.cvtColor(img_hsv.astype(img.dtype), cv2.COLOR_HSV2RGB)  # no return needed
+        return imgs, targets
+
+
+class MOTCleanGT:
+    def __init__(self) -> None:
+        pass
+
+    def __call__(self, imgs: list, targets: list):
+        max_ = 1-1e-9
+
+        for target in targets:
+
+            bbs = target['boxes']
+            tmp = bbs[:, :2].clamp(0,max_)
+            diff = (bbs[:, :2] - tmp).abs()
+            coeff = bbs[:, 2:] / (diff+bbs[:, 2:])
+
+            bbs[:, :2] = tmp
+            bbs[:, 2:] *= coeff
+            
+            keep = ((bbs>=1).sum(-1) + (bbs<0).sum(-1)) == 0
+
+            always_keep = {'size', 'ori_img'}
+            for field in target.keys():
+                if field not in always_keep:
+                    target[field] = target[field][keep]
+
         return imgs, targets
 
 

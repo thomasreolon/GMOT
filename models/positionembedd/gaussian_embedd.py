@@ -31,12 +31,12 @@ class GaussianEmbedder(torch.nn.Module):
         size = self.size //2
         strength = self.strength*(1+0.5*confidences/self.keep_for)
 
-        h_embedd = (torch.arange(size)/ size +0.5/size).view(1,-1)
+        h_embedd = (torch.arange(size, device=ref_pts.device)/ size +0.5/size).view(1,-1)
         h_embedd = h_embedd - ref_pts[:,1].unsqueeze(1)
         h_embedd = 0.01 + torch.exp(-h_embedd**2 *strength[:,None])
         h_embedd = h_embedd/h_embedd.sum(dim=-1)[:,None]
         
-        w_embedd = (torch.arange(size)/ size +0.5/size).view(1,-1) # 1,S
+        w_embedd = (torch.arange(size, device=ref_pts.device)/ size +0.5/size).view(1,-1) # 1,S
         w_embedd = w_embedd - ref_pts[:,0].unsqueeze(1)            # N,1
         w_embedd = 0.01 + torch.exp(-w_embedd**2 *strength[:,None])
         w_embedd = w_embedd/w_embedd.sum(dim=-1)[:,None]

@@ -42,6 +42,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         # Sequence of 5 frames from the same video (show GT for debugging)
         if debug:
             visualizer.visualize_gt(data_dict)
+        
+        exit()
 
         # Forward
         data_dict = utils.data_dict_to_cuda(data_dict, device)

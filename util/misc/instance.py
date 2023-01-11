@@ -199,32 +199,35 @@ class Instances:
 
 
 class TrackInstances(Instances):
-    def __init__(self, embedd_dim, conf_thresh=0.5, keep_for=20, **kwargs: Any):
+    def __init__(self, embedd_dim, conf_thresh=0.5, keep_for=20, init=True, **kwargs: Any):
         super().__init__((1,1), **kwargs)
-        self.__dict__['conf_thresh'] = conf_thresh
-        self.__dict__['keep_for'] = keep_for+1
+        self._embedd_dim = embedd_dim
+        self._conf_thresh = conf_thresh
+        self._keep_for = keep_for+1
     
-        self.q_emb = torch.zeros(0,embedd_dim)
-        self.q_ref = torch.zeros(0,4)
-        self.score = torch.zeros(0)
-        self.gt_idx = torch.zeros(0)
-        self.obj_idx = torch.zeros(0)
-        self.lives = torch.zeros(0)
+        if init:
+            self.q_emb = torch.zeros(0,embedd_dim)
+            self.q_ref = torch.zeros(0,4)
+            self.score = torch.zeros(0)
+            self.gt_idx = torch.zeros(0)
+            self.obj_idx = torch.zeros(0)
+            self.lives = torch.zeros(0)
 
     def add_new(self, q_prop_emb, q_prop_refp):
         n, _ = q_prop_emb.shape
+        d = self.q_emb.device
 
         self._fields['q_emb'] = torch.cat((self.q_emb, q_prop_emb), dim=0)
         self._fields['q_ref'] = torch.cat((self.q_ref, q_prop_refp), dim=0)
-        self._fields['score'] = torch.cat((self.score, torch.zeros(n)), dim=0)
-        self._fields['gt_idx'] = torch.cat((self.gt_idx, -torch.ones(n)), dim=0).long()
-        self._fields['obj_idx'] = torch.cat((self.obj_idx, -torch.ones(n)), dim=0).long()
-        self._fields['lives'] = torch.cat((self.lives, torch.zeros(n)), dim=0).int()
+        self._fields['score'] = torch.cat((self.score, torch.zeros(n,device=d)), dim=0)
+        self._fields['gt_idx'] = torch.cat((self.gt_idx, -torch.ones(n,device=d)), dim=0).long()
+        self._fields['obj_idx'] = torch.cat((self.obj_idx, -torch.ones(n,device=d)), dim=0).long()
+        self._fields['lives'] = torch.cat((self.lives, torch.zeros(n,device=d)), dim=0).int()
         
     def drop_miss(self):
         # possible detections
         threshold = self.score.mean() + self.score.std()
-        threshold = max(threshold, self.__dict__['conf_thresh'])
+        threshold = max(threshold, self._conf_thresh)
         good_score = self.score > threshold
 
         # assigned by matcher
@@ -234,9 +237,26 @@ class TrackInstances(Instances):
         old_tracks = self.lives > 0
 
         # update
-        self.lives[good_score | assigned] = (self.__dict__['keep_for'] * self.score).int()[good_score | assigned]
+        self.lives[good_score | assigned] = (self._keep_for * self.score).int()[good_score | assigned]
         keep = good_score | assigned | old_tracks
         for k in self._fields:
             self._fields[k] = self._fields[k][keep]
 
         self.lives -= 1
+
+    # Tensor-like methods
+    def to(self, *args: Any, **kwargs: Any) -> "Instances":
+        ret = TrackInstances(self._embedd_dim, self._conf_thresh, self._keep_for, init=False)
+        for k, v in self._fields.items():
+            if hasattr(v, "to"):
+                v = v.to(*args, **kwargs)
+            ret.set(k, v)
+        return ret
+
+    def numpy(self):
+        ret = TrackInstances(self._embedd_dim, self._conf_thresh, self._keep_for, init=False)
+        for k, v in self._fields.items():
+            if hasattr(v, "numpy"):
+                v = v.numpy()
+            ret.set(k, v)
+        return ret

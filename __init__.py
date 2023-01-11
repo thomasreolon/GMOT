@@ -39,49 +39,37 @@ def test_position_embedds():
             cv2.imshow(f'[{name}-{sizes}] similarity of queries wrt image', img.numpy())
     cv2.waitKey()
 
-def test_full_embedder():
+def test_dataset_gt():
+    from datasets.fscd import build_fscd
     from configs.defaults import get_args_parser
-    from models.prebackbone import GeneralPreBackbone
-    from models.backbone import GeneralBackbone
-    from models.mixer import GeneralMixer
-    from models.positionembedd import GeneralPositionEmbedder
-    from models.decoder import GeneralDecoder
-
     args = get_args_parser().parse_args()
-    args.position_embedding = 'gauss_sum'
-    pre = GeneralPreBackbone(args)
-    bk = GeneralBackbone(args, pre.ch_out)
-    mx = GeneralMixer(args)
-    emb = GeneralPositionEmbedder(args)
+    from tqdm import tqdm
+
+    dataset = build_fscd('train', args)
+    print('> testing', len(dataset), 'fscd dataset images')
+    tot=0; size=0
+    out = [torch.tensor([0.])]
+    out2= [torch.tensor([1.])]
+    for d in tqdm(dataset):
+        for gt in d['gt_instances']:
+            gt = gt.boxes
+            tot += len(gt)
+            size += (gt[:,2:]>=1).int().sum()+(gt[:,2:]<0).int().sum()
+
+            gt = gt[:,:2]
+            out.append(gt[gt <0].view(-1))
+            out2.append(gt[gt >=1].view(-1))
+    out = torch.cat(out, dim=0)
+    out2 = torch.cat(out2, dim=0)
+
+    # 380749bbox,  5000 out,   _ bb_wrong
+    print(f"""BOXES={tot}
+        smaller 0 = {len(out)}     [mean={out.mean()}   std={out.std()}   min={out.topk(min(len(out),3), largest=False)[0]}]
+        bigger 1 = {len(out2)}     [mean={out2.mean()}   std={out2.std()}   min={out2.topk(min(len(out2),3))[0]}]
+        bb_size = {size}"""
+    )
 
 
-    img = torch.rand(1,3,512,728)
-    exe = torch.rand(1,3,32,64)
-
-    out, mask = bk(*pre(img))
-    exe, mk = bk(*pre(exe))
-    out,q1_ref,q2 = mx(out, exe, mk, {})
-    if q1_ref is None: q1_ref = torch.tensor([[[.8,.2,.1,.1]]])
-    q1 = make_q_from_ref(q1_ref, out)
-
-    # compute pos embedd
-    out, q1, _ = emb(out,q1,None, q1_ref,None,None)
-    sim = (q1 @ out[0][0].flatten(1)).view(out[0].shape[2], out[0].shape[3]).sigmoid()
-    sim = (sim-sim.min()) / (sim.max()-sim.min()) 
-    cv2.imshow(f'(1)sim to: {q1_ref[0,0,:2].tolist()}', sim.numpy())
-
-
-    # copy pos embedd
-    f_scale = out[0]
-    _,_,h,w = f_scale.shape
-    points = (q1_ref[0,:,:2] * torch.tensor([[w,h]])).long().view(-1, 2)
-    q1 = f_scale[0, :, points[:,1], points[:,0]].T.unsqueeze(0)
-
-
-    sim = (q1 @ out[0][0].flatten(1)).view(out[0].shape[2], out[0].shape[3]).sigmoid()
-    sim = (sim-sim.min()) / (sim.max()-sim.min()) 
-    cv2.imshow(f'(2)sim to: {q1_ref[0,0,:2].tolist()}', sim.numpy())
-    cv2.waitKey()
 
 def make_q_from_ref(ref_pts, img_features):
     queries = []
@@ -98,28 +86,23 @@ def test_simple_embedder():
     from models.positionembedd import GeneralPositionEmbedder
     from util.misc import Visualizer
     args = get_args_parser().parse_args()
-    args.position_embedding = 'sin_cat'
+    args.position_embedding = 'gauss_cat'
     args.num_feature_levels = 3
+    args.embedd_dim = 256
 
     embedder = GeneralPositionEmbedder(args)
     q1_ref = torch.tensor([[[.8,.2,0,0],[.0,.0,0,0],[.5,.5,0,0]]])
 
     mif = get_img_feats(args)
-    mif += [torch.zeros(1,256,30,45)]
+    mif += [torch.zeros_like(mif[0])]
 
     q1 = make_q_from_ref(q1_ref[0], mif)[None]
     mif,q1,_ = embedder(mif, q1, None, q1_ref, None, None)
+    q1[0,2,:-32] = 0  ### if clean embedd max is always precise
 
     vis = Visualizer(args)
     import os; os.path.exists(args.output_dir+'/debug/similarity.jpg') and os.remove(args.output_dir+'/debug/similarity.jpg')
     vis.debug_q_similarity(q1, mif, q1_ref,1,'')
-
-    # sim = (q1[:,:1] @ mif[0][0].flatten(1)).view(mif[0].shape[2], mif[0].shape[3])
-    # sim = sim.view(-1).softmax(dim=0).view(sim.shape[0],-1)
-
-    # sim = (sim-sim.min()) / (sim.max()-sim.min()) 
-    # cv2.imshow(f'(A)sim to: {q1_ref[0,0,:2].tolist()}', sim.numpy())
-    # cv2.waitKey()
 
 def get_img_feats(args):
     from models.prebackbone import GeneralPreBackbone
@@ -177,5 +160,5 @@ if __name__=='__main__':
         # test_model_forward()
         # test_position_embedds()
 
-        # test_full_embedder()
-        test_simple_embedder()
+        test_dataset_gt()
+        # test_simple_embedder()
