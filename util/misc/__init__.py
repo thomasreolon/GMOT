@@ -1,11 +1,11 @@
 # object util to contain vectors in an ordered way
-from .instance import Instances
+from .instance import Instances, TrackInstances
 
 # functions to load checkpoints
 from .load_model import load_checkpoint, load_model
 
 # save GPU memory with checkpointing (recomputes values during backward)
-from .backward_ckpt import CheckpointFunction
+from .backward_ckpt import CheckpointFunction, decompose_output
 
 # commonly used in trasnformers to keep input & mask in order
 from .nestedtensor import NestedTensor

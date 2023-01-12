@@ -9,8 +9,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from util.misc import CheckpointFunction
-from util.misc.instance import TrackInstances
+from util.misc import CheckpointFunction, decompose_output, TrackInstances
 
 from .prebackbone import GeneralPreBackbone
 from .backbone import GeneralBackbone
@@ -106,7 +105,7 @@ class GMOT(torch.nn.Module):
             dict_outputs['q_ref'] = q_ref
             dict_outputs['n_prop'] = len(track_instances)
 
-            img_features, q_queries, _ = self.posembed(img_features, q_queries, None, q_ref, None, confidence)
+            img_features, q_queries, _ = self.posembed(img_features, q_queries, None, q_ref, None, confidence, dict_outputs['n_prev'])
             dict_outputs['input_hs'] = q_queries
             dict_outputs['img_features_pos'] = img_features
 
@@ -117,7 +116,7 @@ class GMOT(torch.nn.Module):
             dict_outputs['is_object'] = isobj
             dict_outputs['position']  = coord
 
-            return [v for _,v in dict_outputs.items()]
+            return decompose_output(dict_outputs)
 
         CheckpointFunction.apply(checkpoint_fn, len(args), *args, *params)
         return dict_outputs, track_instances

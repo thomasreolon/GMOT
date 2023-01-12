@@ -9,22 +9,25 @@ def lossfn_is_object(output, target, outputs, targets, i):
     nois_gt = prob[:,:,n_prop:]
 
     pos, _ = matching_preds_gt(output['matching_gt'], prob)   # should predict isobj=1
-    neg, _ = matching_preds_gt(output['matching_gt'], prob)   # should predict isobj=0
+    neg, _ = matching_preds_gt(~output['matching_gt'], prob)   # should predict isobj=0
+
     loss = isobj(pos, True) + isobj(neg, False)      # loss
     if nois_gt.numel() > 0:
-        loss = loss + isobj(nois_gt, True) # "teaching" loss should predict isobj=1
+        loss = loss + isobj(nois_gt, True)   # "teaching" loss should predict isobj=1
 
     return multiplier_decoder_level(loss).mean()
 
-        
+
 def isobj(pred, positive, alpha=0.3, gamma=2.0):
-    if positive:
+    if pred.numel()==0: return torch.zeros(*pred.shape[:-2],1,1,device=pred.device)
+    elif positive:
         res = alpha * ((1 - pred) ** gamma) * (-(pred + 1e-8).log())
     else:
         res = alpha * ((1 - pred) ** gamma) * (-(pred + 1e-8).log())
-    return res
+    return res[...,0].mean(-1)
 
-    
+
+
 # def lossfn_is_object(output, target, outputs, targets, i):
 #     """focal loss, probability there is an object"""
 #     alpha, gamma = 0.3, 2.0

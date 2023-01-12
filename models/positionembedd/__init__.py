@@ -32,32 +32,32 @@ class GeneralPositionEmbedder(nn.Module):
         self.args = args
 
         pos_embedd_size = args.embedd_dim if 'sum' in args.position_embedding else args.embedd_dim//16 *2
-        # option to add x,y directly in concat
+        # TODO: option to add x,y directly in concat
         # option to remove embedd from query
         ## ? cat_sin_sinv2 ?
 
         self.embedder = get_position_type(args.position_embedding, pos_embedd_size, args.keep_for)
         self.fuser = get_fuser(args.position_embedding, args.embedd_dim, pos_embedd_size)
 
-    def forward(self, multiscale_img_feats, q1, q2, q1_ref, q2_ref, confidences):
+    def forward(self, multiscale_img_feats, q1, q2, q1_ref, q2_ref, confidences, n_prev):
         
         img_shape=multiscale_img_feats[0].shape[2:]
-        q1 = self.make_queries(q1, q1_ref, confidences, img_shape)
-        q2 = self.make_queries(q2, q2_ref, None, None)
+        q1 = self.make_queries(q1, q1_ref, confidences, img_shape, n_prev)
+        q2 = self.make_queries(q2, q2_ref, None, None, None)
         multiscale_img_feats = self.make_features(multiscale_img_feats)
 
         return multiscale_img_feats, q1, q2
 
-    def make_queries(self, q, q_ref, confidences,img_shape):
+    def make_queries(self, q, q_ref, confidences,img_shape, n_prev):
         if q is None: return None
 
         b,n,c = q.shape
         q_pos = self.embedder.get_q_pos(q_ref.view(b*n, 4), confidences=confidences, img_shape=img_shape)
-        q = self.fuser(q.view(b*n, -1), q_pos)
+        q = self.fuser(q.view(b*n, -1), q_pos, n_prev)
         return q.view(b,n,c)
 
     def make_features(self, msf):
         poss = [self.embedder.get_fmap_pos(img) for img in msf]
-        msf = [self.fuser(f, f_pos) for f, f_pos in zip(msf, poss)]
+        msf = [self.fuser(f, f_pos,0) for f, f_pos in zip(msf, poss)]
         return msf
         

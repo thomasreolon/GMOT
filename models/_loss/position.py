@@ -19,5 +19,5 @@ def lossfn_position(output, target, outputs, targets, i):
 
 def position(pred_box, tgt_box):
     """in_shapes pred[6,1,N,4] tgt[N,4]"""
-    
-    return (pred_box-tgt_box[None,None]).abs()
+    if pred_box.numel()==0: return torch.zeros(*pred_box.shape[:-2],1,1,device=pred_box.device)
+    return (pred_box-tgt_box[None,None]).abs().mean(-2)

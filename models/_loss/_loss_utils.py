@@ -1,11 +1,11 @@
 import torch
 
 def multiplier_decoder_level(loss) -> torch.Tensor:
-    """shape NL,1,NQ,X  --> 1,NQ,X"""
-    NL,B,NQ,X = loss.shape
+    """shape NL,A,B,...  --> A,B,..."""
+    NL,*N = loss.shape
     scale = torch.arange(NL, dtype=loss.dtype, device=loss.device) / (NL*(NL+1)/2)
     loss = scale.view(1,-1) @ loss.view(NL,-1)
-    return loss.view(B,NQ,X)
+    return loss.view(*N,-1)
 
 def matching_preds_gt(match, prediction, target=None):
     """select predictions matched with GT and the GT"""

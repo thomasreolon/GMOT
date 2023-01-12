@@ -18,6 +18,7 @@ def lossfn_giou(output, target, outputs, targets, i):
 
 
 def giou(pred_box, tgt_box):
+    if pred_box.numel()==0: return torch.zeros(*pred_box.shape[:-2],1,1,device=pred_box.device)
     pred_box = box_cxcywh_to_xyxy(pred_box) # 6,1,N,4
     tgt_box = box_cxcywh_to_xyxy(tgt_box)   # N,4
 
@@ -43,4 +44,4 @@ def giou(pred_box, tgt_box):
     wh = (rb - lt) # [6,1,N,2]
     area = wh[..., 0] * wh[..., 1]
 
-    return (iou - (area - union) / area).unsqueeze(-1)   # [...,None]
+    return (iou - (area - union) / area).mean(-1) # 6,1

@@ -8,7 +8,7 @@ from PIL import Image
 import torch
 import torchvision
 from torch.utils.data import Dataset
-import datasets.transforms as make_viddataset_transforms
+from datasets.transforms import make_viddataset_transforms
 from util.misc import Instances
 
 
@@ -44,7 +44,7 @@ class GMOTDataset(Dataset):
         self.transform = transform
 
         # check files
-        self.dataset_path = args.mot_path + '/GMOT'
+        self.dataset_path = args.gmot_dir
 
         # select files for the split
         self.data = {}
@@ -53,7 +53,7 @@ class GMOTDataset(Dataset):
         self.video_dict = {}
         self.load_files(split, self.dataset_path)
 
-        self.sampler_steps: list = args.sampler_steps
+        self.sampler_steps: list = 1
         self.lengths: list = args.sampler_lengths
         print("sampler_steps={} lenghts={}".format(self.sampler_steps, self.lengths))
         self.period_idx = 0
@@ -125,14 +125,7 @@ class GMOTDataset(Dataset):
         bb = (bb.view(2,2) * torch.tensor([img.shape[2],img.shape[1]]).view(1,2)).flatten()  # coords in img
         bb = torch.cat((bb[:2]-bb[2:]/2, bb[:2]+bb[2:]/2)).int()               # x1y1x2y2
         patch = img[:, bb[1]:bb[3], bb[0]:bb[2]]
-
-        # pad val
-        max_dim = torch.tensor([max(*patch.shape[1:])],dtype=float)
-        pad_size = 2**(int(torch.log2(max_dim).item()) +1)
-        pad_size = max(pad_size, 64)
-        paddings = ((pad_size-patch.shape[2])//2, (pad_size-patch.shape[1])//2, pad_size-patch.shape[2]-(pad_size-patch.shape[2])//2, pad_size-patch.shape[1]-(pad_size-patch.shape[1])//2)
-        img =  torchvision.transforms.functional.pad(patch, paddings)
-        return [img]
+        return [patch]
 
 
     def _pre_single_frame(self, vid, idx):
@@ -196,7 +189,7 @@ class GMOTDataset(Dataset):
 
 
 def build(image_set, args):
-    root = pathlib.Path(args.mot_path)
+    root = pathlib.Path(args.gmot_dir)
     assert root.exists(), f'provided MOT path {root} does not exist'
     transform = make_viddataset_transforms(args, image_set)
     
