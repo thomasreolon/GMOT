@@ -36,6 +36,7 @@ class GMOTDataset(Dataset):
     def __init__(self, args, split='all', transform=None):
         self._cache = {}        # store precomputed inputs (images, patches, ...)
         self.args = args
+        self.current_epoch = 0
         self.transform = transform
         self.num_frames_per_batch = max(args.sampler_lengths)
         self.sample_mode = args.sample_mode
@@ -53,7 +54,7 @@ class GMOTDataset(Dataset):
         self.video_dict = {}
         self.load_files(split, self.dataset_path)
 
-        self.sampler_steps: list = 1
+        self.sampler_steps: list = []
         self.lengths: list = args.sampler_lengths
         print("sampler_steps={} lenghts={}".format(self.sampler_steps, self.lengths))
         self.period_idx = 0
@@ -72,7 +73,7 @@ class GMOTDataset(Dataset):
             self.data[vid] = load_labels(txt_path)
 
             if self.args.small_ds:
-                self.data[vid] = {k:v for k,v in self.data[vid].items() if k<30}
+                self.data[vid] = {k:v for k,v in self.data[vid].items() if k<40}
 
             self.video_dict[vid] = len(self.video_dict)
             t_min = min(self.data[vid].keys())
@@ -149,7 +150,7 @@ class GMOTDataset(Dataset):
             target['obj_ids'] = torch.tensor(target['obj_ids'], dtype=torch.float64)
             target['boxes'] = torch.tensor(target['boxes'], dtype=torch.float32).reshape(-1, 4)
             
-            if len(self._cache) < 3000:
+            if len(self._cache) < 100:
                 self._cache[(vid,idx)] = img, target
         else:
             img, target = self._cache[(vid,idx)]
@@ -172,8 +173,6 @@ class GMOTDataset(Dataset):
         self.num_frames_per_batch = self.lengths[self.period_idx]
 
     def step_epoch(self):
-        # one epoch finishes.
-        print("Dataset: epoch {} finishes".format(self.current_epoch))
         self.set_epoch(self.current_epoch + 1)
 
     def _get_sample_range(self, start_idx):

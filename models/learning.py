@@ -16,7 +16,7 @@ def build_learner(args, model):
     optimizer = torch.optim.AdamW(model.parameters())
 
     # scheduler
-    lr_scheduler = None
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 10)
     return criterion, optimizer, lr_scheduler
 
 
@@ -26,15 +26,17 @@ class Criterion(nn.Module):
         super().__init__()
         self.args = args
         self.losses = {
-            'is_object':2,    # FOCAL_LOSS: if there is an object or no 
-            'position':1,     # L1_LOSS: position of bounding boxes
-            'giou':1,         # IntersectionOverUnion: position of bounding boxes (generalized)
+            # 'is_object':4,    # FOCAL_LOSS: if there is an object or no 
+            # 'position':5,     # L1_LOSS: position of bounding boxes
+            # 'giou':.5,         # IntersectionOverUnion: position of bounding boxes (generalized)
+            'fake':.5,         # IntersectionOverUnion: position of bounding boxes (generalized)
 
         } # TODO: select losses as args parameter
 
     def forward(self, outputs, gt_instances):
         # NOTE: if loss was computed inside the checkpoint would use a bit less total memory ## NOTE: since most of the losses store results in cache should suffice calling self.criterion([dict_output], [gt_inst]) in the _forward_once
         dict_losses = {}
+        print('KKKKKKKKKKKKKKKKKKKKKKKKkkk', len(outputs))
         for loss, multiplier in self.losses.items():
             loss_fn = loss_fn_getter(loss)
             dict_losses[loss] = multiplier * loss_fn(outputs, gt_instances)

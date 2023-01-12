@@ -22,7 +22,7 @@ def get_args_parser():
     # * Training settings
     parser.add_argument('--meta_arch', default='gmot', type=str,            help="model architecture to be used")
     parser.add_argument('--dataset_file', default=['e2e_fscd'], nargs='+',  help="datasets to use for training, will be joined")
-    parser.add_argument('--epochs', default=30, type=int,                   help="fscd:250; mot17:50")
+    parser.add_argument('--epochs', default=10, type=int,                   help="fscd:250; mot17:50")
     parser.add_argument('--small_ds', action='store_true',                  help="use smaller portion of dataset")
     parser.add_argument('--debug', action='store_true',                     help="logs results & visualizations")
 

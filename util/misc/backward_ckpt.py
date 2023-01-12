@@ -1,34 +1,37 @@
 import torch
 
-def decompose_output(element):
+def decompose_output(element, first=False):
     # return all the tensor in the dict
     # require_true will be set to each tensor, in this way backward will reach the Checkpoint
 
     if isinstance(element, torch.Tensor):
-        return [element]
+        res = [element]
     elif isinstance(element, list):
-        return sum((decompose_output(e) for e in element), [])
+        res = sum((decompose_output(e) for e in element), [])
     elif isinstance(element, dict):
-        return sum((decompose_output(e) for e in element.values()), [])
+        res = sum((decompose_output(e) for e in element.values()), [])
     else:
-        return []
+        res = []
+    
+    return tuple(res) if first else res
 
 class CheckpointFunction(torch.autograd.Function):
     """Cool Function to compute gradient at steps by re-forward-passing during the backward"""
     @staticmethod
     def forward(ctx, run_function, length, *args):
+        ctx.asd = torch.rand(1).item()
+        print('HI',ctx, type(ctx), ctx.asd)
         ctx.run_function = run_function
         ctx.input_tensors = list(args[:length])
         ctx.input_params = list(args[length:])
         with torch.no_grad():
             # forward without grad
             output_tensors = ctx.run_function(*ctx.input_tensors)
-        for out in output_tensors:
-            out.requires_grad = True
         return output_tensors
 
     @staticmethod
     def backward(ctx, *output_grads):
+        print('BK', ctx.asd)
         for i in range(len(ctx.input_tensors)):
             temp = ctx.input_tensors[i]
             # detach gradient from input tensors
@@ -39,7 +42,10 @@ class CheckpointFunction(torch.autograd.Function):
         with torch.enable_grad():
             # forward with grad
             output_tensors = ctx.run_function(*ctx.input_tensors)
+            print('BK',[x.shape for x in output_tensors], ctx.asd)
+            print('BK',[x.shape for x in output_grads], ctx.asd)
         output_tensors, output_grads = zip(*filter(lambda t: t[0].requires_grad, zip(output_tensors, output_grads)))
+        print('-BK2: ', [(x.shape==y.shape) for x,y in zip(output_tensors, output_grads)])
         # gradientof_input_and_params = grad(output, start_grad_jacobian)
         input_grads = torch.autograd.grad(output_tensors, to_autograd + ctx.input_params, output_grads, allow_unused=True)
         input_grads = list(input_grads)

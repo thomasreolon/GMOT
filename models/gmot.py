@@ -64,15 +64,15 @@ class GMOT(torch.nn.Module):
         for frame, gt, mask in zip(data['imgs'], data['gt_instances'], data['masks']):
             noised_gt = self.noise_gt(gt) # noise the ground truth and add it as queries to help the network learn later
             # checkpointed forward pass
-            output, track_instances = self._forward_frame(frame.unsqueeze(0), exemplars, noised_gt, track_instances, mask)
+            output, track_instances = self._forward_frame(frame.unsqueeze(0), exemplars, noised_gt, track_instances, mask, gt)
             self.criterion.postprocess(output, track_instances, gt) #in learning.py
             outputs.append(output)
             # exemplars = exemplars... ##### TODO: maybe update
-
+        
         return outputs
 
 
-    def _forward_frame(self, frame, exemplars, noised_gt, track_instances, b_mask):
+    def _forward_frame(self, frame, exemplars, noised_gt, track_instances, b_mask, gt_inst):
         """
         Harder function to read, but allows to lower the amount of used GPU ram 
         """
@@ -116,7 +116,11 @@ class GMOT(torch.nn.Module):
             dict_outputs['is_object'] = isobj
             dict_outputs['position']  = coord
 
-            return decompose_output(dict_outputs)
+            # if not any(['loss_' in k for k in dict_outputs]):
+            #     self.criterion([dict_outputs], [gt_inst])
+            # gradients = {k:v for k,v in dict_outputs.items() if 'loss_' in k}
+
+            return decompose_output(dict_outputs, True)
 
         CheckpointFunction.apply(checkpoint_fn, len(args), *args, *params)
         return dict_outputs, track_instances

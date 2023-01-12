@@ -55,7 +55,7 @@ def main(args):
         # Save
         if args.output_dir:
             checkpoint_path = args.output_dir + '/checkpoint.pth'
-            utils.save_on_master({
+            distrib.save_on_master({
                 'model': model_without_ddp.state_dict(),
                 'optimizer': optimizer.state_dict(),
                 'lr_scheduler': lr_scheduler.state_dict(),

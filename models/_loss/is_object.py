@@ -5,25 +5,32 @@ from ._loss_utils import multiplier_decoder_level, matching_preds_gt
 def lossfn_is_object(output, target, outputs, targets, i):
     """focal loss, probability there is an object"""
     n_prop = len(output['matching_gt'])
-    prob = output['is_object'].sigmoid() # TODO: maybe other activation is better for gradient propagation (sigmoid + softmax over queries?)
+    prob = output['is_object']
     nois_gt = prob[:,:,n_prop:]
 
     pos, _ = matching_preds_gt(output['matching_gt'], prob)   # should predict isobj=1
     neg, _ = matching_preds_gt(~output['matching_gt'], prob)   # should predict isobj=0
 
-    loss = isobj(pos, True) + isobj(neg, False)      # loss
+    loss = isobj(pos.sigmoid(), True) + isobj(neg.sigmoid(), False)      # loss
     if nois_gt.numel() > 0:
-        loss = loss + isobj(nois_gt, True)   # "teaching" loss should predict isobj=1
+        loss = loss + isobj(nois_gt.sigmoid(), True)   # "teaching" loss should predict isobj=1
+
+    # stronger gradient
+    if pos.numel()>0 and neg.numel()>0:
+        pos, neg = pos.mean(-2).unsqueeze(-2).exp(), neg.mean(-2).unsqueeze(-2).exp()
+        tot = pos+neg
+        pos, neg = pos/tot, neg/tot
+        loss = loss + isobj(pos, True) + isobj(neg, False)
 
     return multiplier_decoder_level(loss).mean()
 
 
-def isobj(pred, positive, alpha=0.3, gamma=2.0):
+def isobj(pred, positive, alpha=0.8, gamma=2.0):
     if pred.numel()==0: return torch.zeros(*pred.shape[:-2],1,1,device=pred.device)
     elif positive:
         res = alpha * ((1 - pred) ** gamma) * (-(pred + 1e-8).log())
     else:
-        res = alpha * ((1 - pred) ** gamma) * (-(pred + 1e-8).log())
+        res = (1 - alpha) * (pred ** gamma) * (-(1 - pred + 1e-8).log())
     return res[...,0].mean(-1)
 
 

@@ -1,6 +1,7 @@
 from .is_object import lossfn_is_object
 from .giou import lossfn_giou
 from .position import lossfn_position
+from .fake_loss import lossfn_fake
 
 
 def loss_fn_getter(name):
@@ -10,6 +11,9 @@ def loss_fn_getter(name):
     if name=='giou':
         lossfn_giou.name = 'loss_'+name
         return Wrapper(lossfn_giou, ['position', 'matching_gt'])
+    if name=='fake':
+        lossfn_fake.name = 'loss_'+name
+        return Wrapper(lossfn_fake, ['is_object'])
     if name=='position':
         lossfn_position.name = 'loss_'+name
         return Wrapper(lossfn_position, ['position', 'matching_gt'])

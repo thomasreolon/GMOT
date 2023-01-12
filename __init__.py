@@ -29,17 +29,18 @@ import torch
 
 def test_dataset_gt():
     from datasets.fscd import build_fscd
+    from datasets.gmot import build
     from configs.defaults import get_args_parser
     args = get_args_parser().parse_args()
     from tqdm import tqdm
 
-    dataset = build_fscd('train', args)
+    dataset = build('train', args)
     print('\n\n> Testing', len(dataset), 'fscd dataset images...')
 
     tot=0; size=0
     out = [torch.tensor([0.])]
     out2= [torch.tensor([1.])]
-    for d in tqdm(dataset):
+    for i, d in enumerate(tqdm(dataset)):
         for gt in d['gt_instances']:
             gt = gt.boxes
             tot += len(gt)
@@ -48,15 +49,23 @@ def test_dataset_gt():
             gt = gt[:,:2]
             out.append(gt[gt <0].view(-1))
             out2.append(gt[gt >=1].view(-1))
-    out = torch.cat(out, dim=0)
-    out2 = torch.cat(out2, dim=0)
 
-    # 380749bbox,  5000 out,   _ bb_wrong
+        out_ = torch.cat(out, dim=0)
+        out2_ = torch.cat(out2, dim=0)
+
+
+        if i>0 and i%800==0:
+            print(f"""BOXES={tot}
+            smaller 0 = {len(out_)-1}     [mean={out_.mean()}   std={out_.std()}   min={out_.topk(min(len(out_),3), largest=False)[0]}]
+            bigger 1 = {len(out2_)-1}     [mean={out2_.mean()}   std={out2_.std()}   min={out2_.topk(min(len(out2_),3))[0]}]
+            bb_size = {size}"""
+        )
     print(f"""BOXES={tot}
-        smaller 0 = {len(out)-1}     [mean={out.mean()}   std={out.std()}   min={out.topk(min(len(out),3), largest=False)[0]}]
-        bigger 1 = {len(out2)-1}     [mean={out2.mean()}   std={out2.std()}   min={out2.topk(min(len(out2),3))[0]}]
+        smaller 0 = {len(out_)-1}     [mean={out_.mean()}   std={out_.std()}   min={out_.topk(min(len(out_),3), largest=False)[0]}]
+        bigger 1 = {len(out2_)-1}     [mean={out2_.mean()}   std={out2_.std()}   min={out2_.topk(min(len(out2_),3))[0]}]
         bb_size = {size}"""
     )
+
 
 def test_pos_embedder():
     from configs.defaults import get_args_parser
@@ -114,7 +123,7 @@ def test_single_modules():
     if q1_ref is None: q1_ref = torch.rand(1,20,4).sigmoid()
     q1 = make_q_from_ref(q1_ref[0], out)
     print('- after mixer: q1, q_ref', q1_ref.shape, q1.shape)
-    out, q1, q2 = emb(out,q1,None, q1_ref,None,torch.tensor([0 for i in range(q1_ref.shape[1])]))
+    out, q1, q2 = emb(out,q1[None],None, q1_ref,None,torch.tensor([0 for i in range(q1_ref.shape[1])]),0)
     print('- after embedd',out[0].shape, q1.shape)
     hs, _, _ = dec(out, q2, q1, q1_ref, None, mask)
     print('- after decoder', hs.shape)
@@ -144,6 +153,6 @@ def get_img_feats(args):
 
 if __name__=='__main__':
     with torch.no_grad():
-        test_single_modules()
+        # test_single_modules()
         test_dataset_gt()
         test_pos_embedder()

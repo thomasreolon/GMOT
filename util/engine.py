@@ -40,6 +40,12 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     for d_i, data_dict in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         gc.collect(); torch.cuda.empty_cache()
 
+        # if d_i % 20 == 0:
+        #     params = list(model.parameters())
+        #     for p in  (params[5], params[len(params)//2], params[-1]):
+        #         print(p.view(-1)[:2])
+
+
         # Forward
         data_dict = utils.data_dict_to_cuda(data_dict, device)
         outputs = model(data_dict, debug=debug)
@@ -68,13 +74,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
         # # Log
         metric_logger.update(loss=loss_value, **{k:v for k,v in loss_dict_reduced.items()})
-        if debug and d_i==half:
+        if debug and (d_i==half or d_i==2 or d_i==300):
             # Sequence of 5 frames from the same video (show GT for debugging)
             visualizer.visualize_gt(data_dict)
 
             # Info on what is happening inside the model
             for i in [0,-1]:#range(len(data_dict['imgs'])):
-                visualizer.visualize_infographics(data_dict['imgs'], data_dict['gt_instances'], outputs, i, debug)
+                visualizer.visualize_infographics(data_dict['imgs'], data_dict['gt_instances'], outputs, i, debug+f'b{d_i}_')
 
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
