@@ -4,18 +4,17 @@ from .position import lossfn_position
 
 
 def loss_fn_getter(name):
-    name = 'loss_'+name
     if name=='is_object':
-        lossfn_is_object.name = name
+        lossfn_is_object.name = 'loss_'+name
         return Wrapper(lossfn_is_object, ['is_object', 'matching_gt'])
     if name=='giou':
-        lossfn_giou.name = name
+        lossfn_giou.name = 'loss_'+name
         return Wrapper(lossfn_giou, ['position', 'matching_gt'])
     if name=='position':
-        lossfn_position.name = name
+        lossfn_position.name = 'loss_'+name
         return Wrapper(lossfn_position, ['position', 'matching_gt'])
     else:
-        raise NotImplementedError()
+        raise NotImplementedError(name)
 
 
 def Wrapper(loss_fn, required=[]):

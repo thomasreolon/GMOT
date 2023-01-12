@@ -27,9 +27,9 @@ class Criterion(nn.Module):
         super().__init__()
         self.args = args
         self.losses = {
-            'bbox_position':1,     # position of bounding boxes (center)
-            'bbox_size':1,         # wh of bounding boxes (iou_loss)
-            'is_object':1,         # if the query is visualizing something 
+            'is_object':2,    # FOCAL_LOSS: if there is an object or no 
+            'position':1,     # L1_LOSS: position of bounding boxes
+            'giou':1,         # IntersectionOverUnion: position of bounding boxes (generalized)
 
         } # TODO: select losses as args parameter
 
@@ -68,7 +68,7 @@ class Criterion(nn.Module):
         ii = idxs.div(m, rounding_mode='trunc').tolist()
         jj = (idxs % m).tolist()
 
-        # assignments
+        # assignments # TODO: use hungarian for matching and add other cost other than center_distance
         for i,j in zip(ii,jj):
             if j in assigned_gt or i in assigned_pr:
                 continue # you have already assigned that query or that gt_object

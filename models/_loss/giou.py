@@ -43,4 +43,4 @@ def giou(pred_box, tgt_box):
     wh = (rb - lt) # [6,1,N,2]
     area = wh[..., 0] * wh[..., 1]
 
-    return iou - (area - union) / area
+    return (iou - (area - union) / area).unsqueeze(-1)   # [...,None]

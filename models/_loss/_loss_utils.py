@@ -12,7 +12,7 @@ def matching_preds_gt(match, prediction, target=None):
     # TODO: implement cache? store in output the selection result?
     prediction = prediction[:,:,:len(match)]
     to_select = match>=0
-    prediction = prediction[to_select]
+    prediction = prediction[...,to_select,:]
     if target is not None:
         idxs = match[to_select]
         target = target[idxs]

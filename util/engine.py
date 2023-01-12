@@ -45,7 +45,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         outputs = model(data_dict, debug=debug)
 
         # Compute Loss
-        loss_dict = criterion(outputs, data_dict)
+        loss_dict = criterion(outputs, data_dict['gt_instances'])
         losses = sum(loss_dict.values())
 
         # Reduce losses over all GPUs for logging purposes

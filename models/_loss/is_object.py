@@ -5,10 +5,11 @@ from ._loss_utils import multiplier_decoder_level, matching_preds_gt
 def lossfn_is_object(output, target, outputs, targets, i):
     """focal loss, probability there is an object"""
     n_prop = len(output['matching_gt'])
-    nois_gt = output['is_object'][:,:,n_prop:]
+    prob = output['is_object'].sigmoid() # TODO: maybe other activation is better for gradient propagation (sigmoid + softmax over queries?)
+    nois_gt = prob[:,:,n_prop:]
 
-    pos, _ = matching_preds_gt(output['matching_gt'], output['is_object'])   # should predict isobj=1
-    neg, _ = matching_preds_gt(output['matching_gt'], output['is_object'])   # should predict isobj=0
+    pos, _ = matching_preds_gt(output['matching_gt'], prob)   # should predict isobj=1
+    neg, _ = matching_preds_gt(output['matching_gt'], prob)   # should predict isobj=0
     loss = isobj(pos, True) + isobj(neg, False)      # loss
     if nois_gt.numel() > 0:
         loss = loss + isobj(nois_gt, True) # "teaching" loss should predict isobj=1
@@ -18,9 +19,10 @@ def lossfn_is_object(output, target, outputs, targets, i):
         
 def isobj(pred, positive, alpha=0.3, gamma=2.0):
     if positive:
-        return alpha * ((1 - pred) ** gamma) * (-(pred + 1e-8).log())
+        res = alpha * ((1 - pred) ** gamma) * (-(pred + 1e-8).log())
     else:
-        return alpha * ((1 - pred) ** gamma) * (-(pred + 1e-8).log())
+        res = alpha * ((1 - pred) ** gamma) * (-(pred + 1e-8).log())
+    return res
 
     
 # def lossfn_is_object(output, target, outputs, targets, i):
