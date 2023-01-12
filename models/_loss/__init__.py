@@ -1,11 +1,19 @@
 from .is_object import lossfn_is_object
+from .giou import lossfn_giou
+from .position import lossfn_position
 
 
 def loss_fn_getter(name):
     name = 'loss_'+name
     if name=='is_object':
         lossfn_is_object.name = name
-        return Wrapper(lossfn_is_object, [])
+        return Wrapper(lossfn_is_object, ['is_object', 'matching_gt'])
+    if name=='giou':
+        lossfn_giou.name = name
+        return Wrapper(lossfn_giou, ['position', 'matching_gt'])
+    if name=='position':
+        lossfn_position.name = name
+        return Wrapper(lossfn_position, ['position', 'matching_gt'])
     else:
         raise NotImplementedError()
 
@@ -15,9 +23,9 @@ def Wrapper(loss_fn, required=[]):
     def list_loss_fn(outputs, gt_instances):
         loss, name = 0, loss_fn.name
         if all(k in outputs[0] for k in required):
-            for output, target in zip(outputs, gt_instances):
+            for i, (output, target) in enumerate(zip(outputs, gt_instances)):
                 if name not in output:
-                    output[name] = loss_fn(output, target)
+                    output[name] = loss_fn(output, target, outputs, gt_instances, i)
                 loss = loss + output[name]
         return loss / len(outputs)
     return list_loss_fn

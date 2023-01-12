@@ -81,11 +81,12 @@ class Criterion(nn.Module):
 
         debug_assignments[output['is_object'][-1,0,:,0]>self.args.det_thresh] += 10
         
-        output['debug'] = debug_assignments
-        output['matching'] = track_instances.gt_idx
+        output['debug'] = debug_assignments                     # to draw colored predictions
+        output['matching_gt'] = track_instances.gt_idx          # for losses
+        output['matching_obj'] = track_instances.obj_idx        # for losses
 
         track_instances.q_ref = output['position'][-1,0,:num_proposals]
-        track_instances.q_emb = output['output_hs'][-1,0,:num_proposals]
+        track_instances.q_emb = output['output_hs'][-1,0,:num_proposals] # TODO: find way to update them removing position information
         track_instances.drop_miss()
 
 

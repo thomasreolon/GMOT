@@ -96,12 +96,15 @@ class GMOT(torch.nn.Module):
             # share information between exemplar & input frame
             # returns img_feat[[B,C,H1,W1],[B,C,H2,W2],..]   and    queries positions [[xywh],[xywh],[xywh],...]
             img_features, q_prop_refp, add_keys = self.mixer(img_features, exe_features, exe_masks, dict_outputs)
+            dict_outputs['img_features_mix'] = img_features
 
             # make tracking queries [proposed+previous+GT] or [learned+previous+GT]
             # make input tensors for decorer:   eg.   q_embedd = cat(track.embedd, gt)
+            dict_outputs['n_prev'] = len(track_instances)
             q_queries, q_ref, confidence, attn_mask = \
                 self.update_track_instances(img_features, q_prop_refp, track_instances, noised_gt)
             dict_outputs['q_ref'] = q_ref
+            dict_outputs['n_prop'] = len(track_instances)
 
             img_features, q_queries, _ = self.posembed(img_features, q_queries, None, q_ref, None, confidence)
             dict_outputs['input_hs'] = q_queries

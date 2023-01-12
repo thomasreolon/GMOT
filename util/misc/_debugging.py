@@ -71,7 +71,7 @@ class Visualizer():
         n_prop = q_ref.shape[1] - len(gt[num])
 
         assignments = outputs[num]['debug'].cpu()
-        matching = outputs[num]['matching'].cpu()
+        matching = outputs[num]['matching_dt'].cpu()
         gt_boxes = gt[num].boxes
 
         queries = outputs[num]['input_hs'].cpu()
