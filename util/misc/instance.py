@@ -34,13 +34,20 @@ class Instances:
           confident_detections = instances[instances.scores > 0.9]
     """
 
-    def __init__(self, image_size: Tuple[int, int], **kwargs: Any):
+    def __init__(self, start: Tuple[int, int], **kwargs: Any):
         """
         Args:
-            image_size (height, width): the spatial size of the image.
+            start (height, width): the spatial size of the image.
             kwargs: fields to add to this `Instances`.
+            or
+            start (Instances): the previous instance
         """
-        self._image_size = image_size
+        if isinstance(start, Instances):
+            self.__dict__ = {k:v for k,v in start.__dict__.items() if k != '_fields'}
+        else:
+            assert isinstance(start, tuple)
+            self._image_size = start
+
         self._fields: Dict[str, Any] = {}
         for k, v in kwargs.items():
             self.set(k, v)
@@ -111,7 +118,7 @@ class Instances:
         Returns:
             Instances: all fields are called with a `to(device)`, if the field has this method.
         """
-        ret = Instances(self._image_size)
+        ret = self.__class__(self)
         for k, v in self._fields.items():
             if hasattr(v, "to"):
                 v = v.to(*args, **kwargs)
@@ -119,7 +126,7 @@ class Instances:
         return ret
 
     def numpy(self):
-        ret = Instances(self._image_size)
+        ret = self.__class__(self)
         for k, v in self._fields.items():
             if hasattr(v, "numpy"):
                 v = v.numpy()
@@ -141,7 +148,7 @@ class Instances:
             else:
                 item = slice(item, None, len(self))
 
-        ret = Instances(self._image_size)
+        ret = self.__class__(self)
         for k, v in self._fields.items():
             ret.set(k, v[item])
         return ret
@@ -172,7 +179,7 @@ class Instances:
         image_size = instance_lists[0].image_size
         for i in instance_lists[1:]:
             assert i.image_size == image_size
-        ret = Instances(image_size)
+        ret = instance_lists[0].__class__(instance_lists[0])
         for k in instance_lists[0]._fields.keys():
             values = [i.get(k) for i in instance_lists]
             v0 = values[0]
@@ -190,8 +197,6 @@ class Instances:
     def __str__(self) -> str:
         s = self.__class__.__name__ + "("
         s += "num_instances={}, ".format(len(self))
-        s += "image_height={}, ".format(self._image_size[0])
-        s += "image_width={}, ".format(self._image_size[1])
         s += "fields=[{}])".format(", ".join((f"{k}: {v}" for k, v in self._fields.items())))
         return s
 
@@ -199,14 +204,18 @@ class Instances:
 
 
 class TrackInstances(Instances):
-    def __init__(self, embedd_dim, conf_thresh=0.5, keep_for=20, init=True, **kwargs: Any):
-        super().__init__((1,1), **kwargs)
-        self._embedd_dim = embedd_dim
-        self._conf_thresh = conf_thresh
-        self._keep_for = keep_for+1
+    def __init__(self, start, init=True, **kwargs: Any):
+        if isinstance(start, Instances):
+            super().__init__(start, **kwargs)
+        else:
+            assert isinstance(start, dict)
+            super().__init__((1,1), **kwargs)
+            self._embedd_dim = start['embedd_dim']
+            self._conf_thresh = start['det_thresh']
+            self._keep_for = start['keep_for']+1
     
         if init:
-            self.q_emb = torch.zeros(0,embedd_dim)
+            self.q_emb = torch.zeros(0,self._embedd_dim)
             self.q_ref = torch.zeros(0,4)
             self.score = torch.zeros(0)
             self.gt_idx = torch.zeros(0)
@@ -243,20 +252,3 @@ class TrackInstances(Instances):
             self._fields[k] = self._fields[k][keep]
 
         self.lives -= 1
-
-    # Tensor-like methods
-    def to(self, *args: Any, **kwargs: Any) -> "Instances":
-        ret = TrackInstances(self._embedd_dim, self._conf_thresh, self._keep_for, init=False)
-        for k, v in self._fields.items():
-            if hasattr(v, "to"):
-                v = v.to(*args, **kwargs)
-            ret.set(k, v)
-        return ret
-
-    def numpy(self):
-        ret = TrackInstances(self._embedd_dim, self._conf_thresh, self._keep_for, init=False)
-        for k, v in self._fields.items():
-            if hasattr(v, "numpy"):
-                v = v.numpy()
-            ret.set(k, v)
-        return ret

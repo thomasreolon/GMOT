@@ -47,33 +47,39 @@ class GMOT(torch.nn.Module):
 
 
     def forward(self, data, debug=None):
+        """ (batch size forcefully == 1)
+
+            Arguments:
+                data['imgs']         = list_of_CHW_tensors  --> [torch.rand(3,256,256), torch.rand(3,256,256), ...]
+                data['gt_instances'] = list_of_gt_instances  --> [inst1, inst2, ...]     , with i containing (boxes, obj_ids)
+                data['exemplar']     = list_of_chw_tensors  --> [torch.rand(3,64,64)]
+            
+            Returns:
+                ...
         """
-            data['imgs']         = list_of_CHW_tensors  --> [torch.rand(3,256,256), torch.rand(3,256,256), ...]
-            data['gt_instances'] = list_of_gt_instances  --> [inst1, inst2, ...]     , with i containing (boxes, obj_ids)
-            data['exemplar']     = list_of_chw_tensors  --> [torch.rand(3,64,64)]
-        """
+        if 'masks'        not in data: data['masks']        = [None for _ in range(len(data['imgs']))]
+        if 'gt_instances' not in data: data['gt_instances'] = [None for _ in range(len(data['imgs']))]
 
         # initially no tracks
         outputs = []
-        if 'masks' not in data: data['masks'] = [None for _ in range(len(data['imgs']))]
-        track_instances = TrackInstances(self.args.embedd_dim, self.args.det_thresh, self.args.keep_for).to(data['imgs'][0].device)
+        device = data['imgs'][0].device
+        track_instances = TrackInstances(vars(self.args)).to(device)
         exemplars = torch.stack(data['exemplar'][:1]) # TODO: support multiple exemplars?
         
         # iterate though all frames
-        for frame, gt, mask in zip(data['imgs'], data['gt_instances'], data['masks']):
-            noised_gt = self.noise_gt(gt) # noise the ground truth and add it as queries to help the network learn later
+        for frame, gt_inst, mask in zip(data['imgs'], data['gt_instances'], data['masks']):
+            # noised_gt = self.noise_gt(gt) # noise the ground truth and add it as queries to help the network learn later
             # checkpointed forward pass
-            output, track_instances = self._forward_frame(frame.unsqueeze(0), exemplars, noised_gt, track_instances, mask, gt)
-            self.criterion.postprocess(output, track_instances, gt) #in learning.py
+            output, track_instances = self._forward_frame(frame.unsqueeze(0), exemplars, track_instances, mask, gt_inst)
+            self.criterion.postprocess(output, track_instances, gt_inst) #in learning.py
             outputs.append(output)
-            # exemplars = exemplars... ##### TODO: maybe update
         
         return outputs
 
 
     def _forward_frame(self, frame, exemplars, noised_gt, track_instances, b_mask, gt_inst):
         """
-        Harder function to read, but allows to lower the amount of used GPU ram 
+        Wrapper to checkpoint function, which allows to use less GPU_RAM 
         """
         args = [frame, noised_gt, exemplars, b_mask]
         params = tuple((p for p in self.parameters() if p.requires_grad))
