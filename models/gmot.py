@@ -30,11 +30,10 @@ class GMOT(torch.nn.Module):
     def __init__(self, args) -> None:
         super().__init__()
         self.args   = args
-        hidden_dim  = args.embedd_dim
 
         # self.track_embed = track_embed        # used in post process eval
         # self.use_checkpoint = use_checkpoint  # to look into
-        # self.query_denoise = query_denoise   # add noise to GT in training
+        # self.query_denoise = query_denoise    # add noise to GT in training
         self.prebk    = GeneralPreBackbone(args)
         self.backbone = GeneralBackbone(args, self.prebk.ch_out)
         self.mixer    = GeneralMixer(args)
@@ -44,7 +43,7 @@ class GMOT(torch.nn.Module):
         if self.mixer.ref_is_none:
             # learned queries when they are not provided by the mixer
             self.ref_pts = nn.Embedding(args.num_queries, 4)
-            self.q_embed = nn.Embedding(args.num_queries, hidden_dim)
+            self.q_embed = nn.Embedding(args.num_queries, args.embedd_dim)
 
 
     def forward(self, data, debug=None):
@@ -116,11 +115,11 @@ class GMOT(torch.nn.Module):
             dict_outputs['is_object'] = isobj
             dict_outputs['position']  = coord
 
-            # if not any(['loss_' in k for k in dict_outputs]):
-            #     self.criterion([dict_outputs], [gt_inst])
-            # gradients = {k:v for k,v in dict_outputs.items() if 'loss_' in k}
+            if not any(['loss_' in k for k in dict_outputs]):
+                self.criterion([dict_outputs], [gt_inst])
+            gradients = {k:v for k,v in dict_outputs.items() if 'loss_' in k}
 
-            return decompose_output(dict_outputs, True)
+            return decompose_output(gradients)
 
         CheckpointFunction.apply(checkpoint_fn, len(args), *args, *params)
         return dict_outputs, track_instances

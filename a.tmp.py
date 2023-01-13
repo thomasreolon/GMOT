@@ -59,6 +59,40 @@ class CheckpointFunction(torch.autograd.Function):
                 input_grads.insert(i, None)
         return (None, None) + tuple(input_grads)
 
+
 def check_require_grad(t):
     return isinstance(t, torch.Tensor) and t.requires_grad
 
+
+###########################################################
+import torch.nn as nn
+model = nn.Sequential(nn.Linear(4,2048),nn.ReLU(),nn.Linear(2048,8192),nn.ReLU(),nn.Linear(8192,4)).cuda().train()
+input = torch.rand(3, 4).cuda()
+
+
+outputs = []
+tmp = input
+for k in range(100):
+
+    output = {}
+    def ckpt_fn(tmp, i):
+        out = model(tmp)
+        output['out'] = out
+        output['loss'] = - (out[...,0]-i)**2 
+        output['i'] = i
+
+        return decompose_output(output, True)
+
+    CheckpointFunction.apply(ckpt_fn, 2, tmp, k, *list(model.parameters()))
+    outputs.append(output)
+    tmp = output['out']
+
+
+loss = sum(( -v['loss'].sum() for v in outputs))
+
+for o in outputs:
+    out=o['out']
+    loss = loss + ((out[...,1]-9)**2).mean()
+
+loss.backward()
+print(list(model.parameters())[0].grad.sum())

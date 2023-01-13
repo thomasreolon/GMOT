@@ -5,6 +5,7 @@ from ._loss_utils import multiplier_decoder_level, matching_preds_gt
 def lossfn_fake(output, target, outputs, targets, i):
     """focal loss, probability there is an object"""
     prob = output['is_object']
+    print('LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL')
 
     return ((prob.sigmoid()-0)**2).mean()
 
