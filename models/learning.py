@@ -36,14 +36,13 @@ class Criterion(nn.Module):
     def forward(self, outputs, gt_instances):
         # NOTE: if loss was computed inside the checkpoint would use a bit less total memory ## NOTE: since most of the losses store results in cache should suffice calling self.criterion([dict_output], [gt_inst]) in the _forward_once
         dict_losses = {}
-        print('KKKKKKKKKKKKKKKKKKKKKKKKkkk', len(outputs))
         for loss, multiplier in self.losses.items():
             loss_fn = loss_fn_getter(loss)
             dict_losses[loss] = multiplier * loss_fn(outputs, gt_instances)
         return dict_losses
 
     @torch.no_grad()
-    def postprocess(self, output:dict, track_instances:TrackInstances, gt_inst:Instances):
+    def matching(self, output:dict, track_instances:TrackInstances, gt_inst:Instances, compute_losses:bool=False):
         assigned_pr = {int(i) for i in torch.where(track_instances.gt_idx>=0)[0]} # can't assign query to more than one target
         track_instances.gt_idx[:] = -1  # deletes previous assignments
 
@@ -84,14 +83,8 @@ class Criterion(nn.Module):
             debug_assignments[i] = 3
 
         debug_assignments[output['is_object'][-1,0,:,0]>self.args.det_thresh] += 10
-        
-        output['debug'] = debug_assignments                     # to draw colored predictions
-        output['matching_gt'] = track_instances.gt_idx          # for losses
-        output['matching_obj'] = track_instances.obj_idx        # for losses
 
-        track_instances.q_ref = output['position'][-1,0,:num_proposals]
-        track_instances.q_emb = output['output_hs'][-1,0,:num_proposals] # TODO: find way to update them removing position information
-        track_instances.drop_miss()
+        return debug_assignments, track_instances.gt_idx, track_instances.obj_idx
 
 
 

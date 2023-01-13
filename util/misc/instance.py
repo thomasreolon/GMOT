@@ -204,7 +204,7 @@ class Instances:
 
 
 class TrackInstances(Instances):
-    def __init__(self, start, init=True, **kwargs: Any):
+    def __init__(self, start, init=False, _idxs=None, **kwargs: Any):
         if isinstance(start, Instances):
             super().__init__(start, **kwargs)
         else:
@@ -213,8 +213,10 @@ class TrackInstances(Instances):
             self._embedd_dim = start['embedd_dim']
             self._conf_thresh = start['det_thresh']
             self._keep_for = start['keep_for']+1
+            self._idxs = _idxs
     
         if init:
+            self._idxs = [0,0] # how many queries from prev iteration there are ; how many queries from this iteration ; the other are gt_queries
             self.q_emb = torch.zeros(0,self._embedd_dim)
             self.q_ref = torch.zeros(0,4)
             self.score = torch.zeros(0)
@@ -222,18 +224,26 @@ class TrackInstances(Instances):
             self.obj_idx = torch.zeros(0)
             self.lives = torch.zeros(0)
 
-    def add_new(self, q_prop_emb, q_prop_refp):
+    def add_new(self, q_prop_emb, q_prop_refp, is_gt=False):
         n, _ = q_prop_emb.shape
         d = self.q_emb.device
+        l = self._keep_for * int(is_gt) 
 
         self._fields['q_emb'] = torch.cat((self.q_emb, q_prop_emb), dim=0)
         self._fields['q_ref'] = torch.cat((self.q_ref, q_prop_refp), dim=0)
         self._fields['score'] = torch.cat((self.score, torch.zeros(n,device=d)), dim=0)
         self._fields['gt_idx'] = torch.cat((self.gt_idx, -torch.ones(n,device=d)), dim=0).long()
         self._fields['obj_idx'] = torch.cat((self.obj_idx, -torch.ones(n,device=d)), dim=0).long()
-        self._fields['lives'] = torch.cat((self.lives, torch.zeros(n,device=d)), dim=0).int()
+        self._fields['lives'] = torch.cat((self.lives, l*torch.ones(n,device=d)), dim=0).int()
+
+        if not is_gt:
+            self._idxs[1] = len(self)
         
-    def drop_miss(self):
+    def get_tracks_next_frame(self, refs, emb):
+        # output becomes new frame's input
+        self.q_ref = refs[-1,0,:,:]
+        self.q_emb = emb[-1,0,:,:]
+
         # possible detections
         threshold = self.score.mean() + self.score.std()
         threshold = max(threshold, self._conf_thresh)
@@ -252,3 +262,19 @@ class TrackInstances(Instances):
             self._fields[k] = self._fields[k][keep]
 
         self.lives -= 1
+        self._idxs[0] = len(self)
+        return self.get_prevnew_queries()
+
+    #           (     from previous frame     )  (         new detection queries          )  (    gt queries    )
+    # q_emb = [ size(256), size(256), size(256), size(256), size(256), size(256), size(256), size(256), size(256) ]
+    # self._idxs = [3, 7]
+    def get_prev_queries(self):
+        return self[:self._idxs[0]]
+    def get_new_queries(self):
+        return self[self._idxs[0]:self._idxs[1]]
+    def get_gt_queries(self):
+        return self[self._idxs[1]:]
+    def get_prevnew_queries(self):
+        return self[:self._idxs[1]]
+    def get_newgt_queries(self):
+        return self[self._idxs[0]:]

@@ -48,20 +48,19 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
         # Forward
         data_dict = utils.data_dict_to_cuda(data_dict, device)
-        outputs = model(data_dict, debug=debug)
+        outputs, loss_dict = model(data_dict)
 
         # Compute Loss
-        loss_dict = criterion(outputs, data_dict['gt_instances'])
-        losses = sum(loss_dict.values())
+        losses = sum((sum(d.values()) for d in loss_dict))
 
-        # Reduce losses over all GPUs for logging purposes
-        if d_i%print_freq==0:
-            loss_dict_reduced = {k: v for k, v in utils.reduce_dict(loss_dict).items()}
-            loss_value = sum(loss_dict_reduced.values()).item()
-            if not math.isfinite(loss_value):
-                print("Loss is {}, stopping training".format(loss_value))
-                print(loss_dict_reduced)
-                sys.exit(1)
+        # # Reduce losses over all GPUs for logging purposes
+        # if d_i%print_freq==0:
+        #     loss_dict_reduced = {k: v for k, v in utils.reduce_dict(loss_dict).items()}
+        #     loss_value = sum(loss_dict_reduced.values()).item()
+        #     if not math.isfinite(loss_value):
+        #         print("Loss is {}, stopping training".format(loss_value))
+        #         print(loss_dict_reduced)
+        #         sys.exit(1)
 
         # Backward
         optimizer.zero_grad()
@@ -73,7 +72,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         optimizer.step()
 
         # # Log
-        metric_logger.update(loss=loss_value, **{k:v for k,v in loss_dict_reduced.items()})
+        # metric_logger.update(loss=loss_value, **{k:v for k,v in loss_dict_reduced.items()})
         if debug and (d_i==half or d_i==2 or d_i==300):
             # Sequence of 5 frames from the same video (show GT for debugging)
             visualizer.visualize_gt(data_dict)
