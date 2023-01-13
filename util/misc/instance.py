@@ -179,7 +179,7 @@ class Instances:
         image_size = instance_lists[0].image_size
         for i in instance_lists[1:]:
             assert i.image_size == image_size
-        ret = instance_lists[0].__class__(instance_lists[0])
+        ret = instance_lists[0].__class__(instance_lists[0]) # NOTE: doesn't really update _idxs but is not a problem for now
         for k in instance_lists[0]._fields.keys():
             values = [i.get(k) for i in instance_lists]
             v0 = values[0]

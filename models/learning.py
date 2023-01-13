@@ -8,16 +8,12 @@ from util.misc import TrackInstances, Instances
 from ._loss import loss_fn_getter
 
 def build_learner(args, model):
-    # loss fn
-    criterion = Criterion(args, model)
-    model.criterion = criterion
-
     # optimizer
     optimizer = torch.optim.AdamW(model.parameters())
 
     # scheduler
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 10)
-    return criterion, optimizer, lr_scheduler
+    return optimizer, lr_scheduler
 
 
 

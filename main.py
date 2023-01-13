@@ -22,10 +22,9 @@ def main(args):
     device = torch.device(args.device)
 
     # Build Model
-    model      = build_model(args)                      # transformer tracker
-    criterion, optimizer, lr_scheduler \
-               = build_learner(args, model)             # loss function: models_outputs, ground_truth --> scalar
-    tr_dataset = build_dataset('train', args)                    # dict(imgs, gt_instances, exemplar) 
+    model      = build_model(args)                          # transformer tracker
+    optimizer, lr_scheduler = build_learner(args, model)    # loss function: models_outputs, ground_truth --> scalar
+    tr_dataset = build_dataset('train', args)               # dict(imgs, gt_instances, exemplar) 
 
     # Distribute Model & Dataset (if args.distributed==True)
     sampler, data_loader_train, model_without_ddp, model = distrib.make_distributed(args, model, tr_dataset)
@@ -48,7 +47,7 @@ def main(args):
             debug = f'epoch_{epoch}/img{distrib.get_rank()}_'
 
         # Train
-        train_one_epoch(model, criterion, data_loader_train, optimizer, device, epoch, args, debug)
+        train_one_epoch(model, data_loader_train, optimizer, device, epoch, args, debug)
         lr_scheduler.step()
         tr_dataset.step_epoch()
 

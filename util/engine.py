@@ -22,12 +22,11 @@ from .misc import Visualizer
 # TODO: batchsize
 # TODO: in main: fn "change params between epochs"   t=[t1,t2,t3,t2,t1];  new_p=t[int(len(t)*epoch/n_epochs)]  ;  set_param(new_p)
 
-def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
+def train_one_epoch(model: torch.nn.Module, 
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
                     device: torch.device, epoch: int, args: dict, debug:str):
 
     model.train()
-    criterion.train()
 
     # Set Up Logger
     visualizer = Visualizer(args)

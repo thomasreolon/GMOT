@@ -11,6 +11,7 @@ from .backbone import GeneralBackbone
 from .mixer import GeneralMixer
 from .positionembedd import GeneralPositionEmbedder
 from .decoder import GeneralDecoder
+from .learning import Criterion
 
 def build(args):
     model = GMOT(args)
@@ -21,24 +22,28 @@ def build(args):
 
 
 class GMOT(torch.nn.Module):
+    """
+    Core Module made of 5 components:
+        prebackbone: pad images                     f(tensor.shape[1,3,H,W])                    -> tensor.shape[1,n,H,W]
+        backbone: extracts features                 f(tensor.shape[1,n,H,W])                    -> [tensor.shape[1,C,h1,w1],tensor.shape[1,C,h2,w2],...]
+        mixer: uses info from exemplar              f(img_features, exemplar_feats)              -> newimg_features, query_positions, additional_decoder_keys
+        posembed: transformer positional embeddings f(newimg_features, queries, query_positions) -> newimg_features, queries
+        decoder: extracts features                  f(newimg_features, queries, query_positions,additional_decoder_keys) -> predictions
+    """
 
     def __init__(self, args) -> None:
         super().__init__()
         self.args   = args
+        args.use_checkpointing = True  # runs out of memory otherwise
 
         # self.track_embed = track_embed        # used in post process eval
-        # self.use_checkpoint = use_checkpoint  # to look into
-        # self.query_denoise = query_denoise    # add noise to GT in training
         self.prebk    = GeneralPreBackbone(args)
         self.backbone = GeneralBackbone(args, self.prebk.ch_out)
         self.mixer    = GeneralMixer(args)
         self.posembed = GeneralPositionEmbedder(args)
         self.decoder  = GeneralDecoder(args)
 
-        if self.mixer.ref_is_none:
-            # learned queries when they are not provided by the mixer
-            self.ref_pts = nn.Embedding(args.num_queries, 4)
-            self.q_embed = nn.Embedding(args.num_queries, args.embedd_dim)
+        self.criterion = Criterion(args, self)
 
 
     def forward(self, data:dict):
@@ -50,28 +55,26 @@ class GMOT(torch.nn.Module):
                 data['exemplar']     = list_of_chw_tensors  --> [torch.rand(3,64,64)]
             
             Returns:
-                ...
+                loss_dicts: List[Dict[str,Tensor]]    (losses are computed in the forward to maximize checkpointing usefulness)
         """
         if 'masks'        not in data: data['masks']        = [None for _ in range(len(data['imgs']))]
-        # if 'gt_instances' not in data: data['gt_instances'] = [None for _ in range(len(data['imgs']))]  # gt always required for matching
 
-        self.args.use_checkpointing = True
         process_frame_fn = self._forward_frame_train_ckpt if self.args.use_checkpointing else self.forward_frame_train
 
         # initializations
-        outputs, losses = [], []
+        losses = []
         device = data['imgs'][0].device
         track_instances = TrackInstances(vars(self.args), init=True).to(device)
         exemplars = torch.stack(data['exemplar'][:1]) # TODO: support multiple exemplars?
         
         # iterate though all frames
         for frame, gt_inst, mask in zip(data['imgs'], data['gt_instances'], data['masks']):
-            output, loss, track_instances = process_frame_fn(exemplars, frame.unsqueeze(0), gt_inst, mask, track_instances)
-            # outputs.append(output)
-            del output
-            losses.append(loss)
+            loss_dict, track_instances = process_frame_fn(exemplars, frame.unsqueeze(0), gt_inst, mask, track_instances)
+            losses.append(loss_dict)
+
+        loss_dict = self.criterion.forward_inter_frame(losses)
         
-        return outputs, losses
+        return loss_dict
 
 
     def forward_frame_train(self, exemplars:Tensor, frame:Tensor, gt_inst:Instances, mask:Tensor, track_instances:TrackInstances):
@@ -90,19 +93,13 @@ class GMOT(torch.nn.Module):
         
         # share information between exemplar & input frame
         # returns img_feat[[B,C,H1,W1],[B,C,H2,W2],..]   and    queries positions [[xywh],[xywh],[xywh],...]
-        img_features_mix, q_prop_refp, add_keys = self.mixer(img_features, exe_features, exe_masks, {})
+        img_features_mix, add_keys, attn_mask = self.mixer(img_features, exe_features, exe_masks, track_instances, noised_gt_boxes, {})
         
-        # make tracking queries [proposed+previous+GT] or [learned+previous+GT]
-        # make input tensors for decorer:   eg.   q_embedd = cat(track.embedd, gt)
-        # TODO: move into mixer more elegantly
-        q_queries, q_ref, _, attn_mask = \
-            self.update_track_instances(img_features_mix, q_prop_refp, track_instances, noised_gt_boxes)
-
-        img_features_pos, q_queries, _ = self.posembed(img_features, q_queries, None, q_ref, None, track_instances.lives, track_instances._idxs[0])
+        img_features_pos, track_instances_pos, attn_mask = self.posembed(img_features, track_instances)
 
         # TODO: change how ref_pts are updated
-        hs, isobj, coord = self.decoder(img_features, add_keys, q_queries, q_ref, attn_mask, img_masks)
-        coord = self._fix_pad(coord, mask)
+        hs, isobj, coord = self.decoder(img_features, add_keys, track_instances_pos.q_emb, track_instances_pos.q_ref, attn_mask, img_masks)
+        coord = self._fix_pad(coord, mask)#TODO: move to prebk
 
         ##################   LOSS  ###################
 
@@ -111,9 +108,6 @@ class GMOT(torch.nn.Module):
             'img_features_mix':[i.cpu() for i in img_features_mix],
             'img_features_pos': [i.cpu() for i in img_features_pos],
             
-            'input_hs': q_queries,
-            'q_ref': q_ref,
-
             'output_hs': hs,
             'position': coord,
             'is_object': isobj,
@@ -141,6 +135,7 @@ class GMOT(torch.nn.Module):
         Wrapper to checkpoint function, which allows to use less GPU_RAM 
         """
 
+        # parameters needed in the function --> unrolled
         gt_inst_args = [gt_inst.boxes, gt_inst.obj_ids, gt_inst.labels]
         tr_inst_args = [track_instances._idxs[0], track_instances._idxs[1], *[v for v in track_instances._fields.values()]]
         tr_keys = list(track_instances._fields.keys())
@@ -176,48 +171,6 @@ class GMOT(torch.nn.Module):
         coord = torch.cat((coord_xy, coord[...,2:]), dim=-1)
         coord = coord * torch.tensor([w/nw, h/nh, w/nw, h/nh], device=coord.device)
         return coord
-
-    def update_track_instances(self, img_features, q_prop_refp, track_instances:TrackInstances, noised_gt:Tensor):
-        # queries to detect new tracks
-        if q_prop_refp is None:
-            q_prop_emb  = self.q_embed.weight.data
-            q_prop_refp = self.ref_pts.weight.data.sigmoid()
-        else:
-            q_prop_emb  = self.make_q_from_ref(q_prop_refp[0], img_features)
-
-        # queries used to help learning
-        if noised_gt is not None:
-            q_gt_refp = noised_gt.clamp(0,0.9998)
-            q_gt_emb  = self.make_q_from_ref(q_gt_refp, img_features)
-            n_gt      = q_gt_refp.shape[0]
-        else:
-            q_gt_refp = torch.zeros((0, 4))
-            q_gt_emb  = torch.zeros((0, q_prop_emb.shape[1]))
-            n_gt      = 0
-
-        # add queries to detect new tracks to track_instances
-        track_instances.add_new(q_prop_emb, q_prop_refp)
-        track_instances.add_new(q_gt_emb, q_gt_refp, is_gt=True)
-
-        # final queries for the decoder
-        q_queries = track_instances.q_emb
-        q_ref_pts = track_instances.q_ref
-
-        n_tot = q_queries.shape[-2]
-        attn_mask = torch.zeros((n_tot, n_tot), dtype=bool, device=q_queries.device)
-        attn_mask[:n_gt, n_gt:] = True
-
-        return q_queries.unsqueeze(0), q_ref_pts.unsqueeze(0), track_instances.lives, attn_mask
-
-    def make_q_from_ref(self, ref_pts, img_features):
-        queries = []
-        for f_scale in img_features:
-            _,_,h,w = f_scale.shape
-            points = (ref_pts[:,:2] * torch.tensor([[w,h]],device=ref_pts.device)).long().view(-1, 2)
-            q = f_scale[0, :, points[:,1], points[:,0]]
-            queries.append(q.T)  # N, C
-        queries = torch.stack(queries, dim=0).mean(dim=0)
-        return queries
 
     def noise_gt(self, boxes):
         return boxes + torch.rand_like(boxes)*0.08 -0.04

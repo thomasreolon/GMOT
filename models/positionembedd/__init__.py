@@ -1,4 +1,8 @@
-import torch.nn as nn
+from typing import List, Tuple
+
+from torch import nn, Tensor
+
+from util.misc import TrackInstances
 from .gaussian_embedd import GaussianEmbedder
 from .sine_embedd import SinCosEmbedder
 from .embedders import ConcatPos, SumPos
@@ -37,23 +41,36 @@ class GeneralPositionEmbedder(nn.Module):
         ## ? cat_sin_sinv2 ?
 
         self.embedder = get_position_type(args.position_embedding, pos_embedd_size, args.keep_for)
-        self.fuser = get_fuser(args.position_embedding, args.embedd_dim, pos_embedd_size)
+        self.fuser_pre = get_fuser(args.position_embedding, args.embedd_dim, pos_embedd_size)
+        self.fuser_new = get_fuser(args.position_embedding, args.embedd_dim, pos_embedd_size)
 
-    def forward(self, multiscale_img_feats, q1, q2, q1_ref, q2_ref, confidences, n_prev):
+    def forward(self, multiscale_img_feats:List[Tensor], track_instances:TrackInstances) -> Tuple[List[Tensor], TrackInstances]:
         
-        img_shape=multiscale_img_feats[0].shape[2:]
-        q1 = self.make_queries(q1, q1_ref, confidences, img_shape, n_prev)
-        q2 = self.make_queries(q2, q2_ref, None, None, None)
+        # img_feature processing
         multiscale_img_feats = self.make_features(multiscale_img_feats)
 
-        return multiscale_img_feats, q1, q2
+        tmp = len(track_instances)
 
-    def make_queries(self, q, q_ref, confidences,img_shape, n_prev):
+        # new queries processing
+        new_gt = track_instances.get_newgt_queries()
+        new_gt.q_emb = self.make_queries(new_gt.q_emb, new_gt.q_ref, new_gt.lives, self.fuser_new)
+
+        # previous queries processing
+        pre_gt = track_instances.get_prev_queries()
+        pre_gt.q_emb = self.make_queries(pre_gt.q_emb, pre_gt.q_ref, pre_gt.lives, self.fuser_pre)
+
+        track_instances = TrackInstances.cat([pre_gt, new_gt])
+
+        assert tmp == len(tmp)
+
+        return multiscale_img_feats, track_instances
+
+    def make_queries(self, q, q_ref, confidences, fuser):
         if q is None: return None
 
         b,n,c = q.shape
-        q_pos = self.embedder.get_q_pos(q_ref.view(b*n, 4), confidences=confidences, img_shape=img_shape)
-        q = self.fuser(q.view(b*n, -1), q_pos, n_prev)
+        q_pos = self.embedder.get_q_pos(q_ref.view(b*n, 4), confidences=confidences)
+        q = fuser(q.view(b*n, -1), q_pos)
         return q.view(b,n,c)
 
     def make_features(self, msf):

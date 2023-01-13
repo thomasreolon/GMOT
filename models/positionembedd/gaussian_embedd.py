@@ -10,7 +10,6 @@ class GaussianEmbedder(torch.nn.Module):
         self.strength = strength
         self.keep_for = keep_for
 
-    @torch.no_grad()
     def get_fmap_pos(self, feat_map):
         B,_,H,W = feat_map.shape
         size = self.size //2
@@ -26,7 +25,7 @@ class GaussianEmbedder(torch.nn.Module):
         return embedd.permute(2,0,1).unsqueeze(0).expand(B,-1,-1,-1)
 
     @torch.no_grad()
-    def get_q_pos(self, ref_pts, confidences=None, img_shape=None):
+    def get_q_pos(self, ref_pts, confidences=None):
         if confidences is None: confidences = torch.zeros(ref_pts.shape[0])
         size = self.size //2
         strength = self.strength*(1+0.5*confidences/self.keep_for)
