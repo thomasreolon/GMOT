@@ -129,27 +129,27 @@ class GMOT(torch.nn.Module):
 
         # parameters needed in the function --> unrolled
         gt_inst_args = [gt_inst.boxes, gt_inst.obj_ids, gt_inst.labels]
-        tr_inst_args = [track_instances._idxs[0], track_instances._idxs[1], *[v for v in track_instances._fields.values()]]
+        tr_inst_args = track_instances._fields.values()
         tr_keys = list(track_instances._fields.keys())
         args = [exemplars, frame, mask, *gt_inst_args, *tr_inst_args]
         params = tuple((p for p in self.parameters() if p.requires_grad))
 
         tmp = []
-        def ckpt_fn(exemplars, frame, mask, gt_box, gt_obj_ids, gt_labels, tr_id1, tr_id2, *tr_inst_args):
+        def ckpt_fn(exemplars, frame, mask, gt_box, gt_obj_ids, gt_labels, *tr_inst_args):
             assert len(tr_keys)==len(tr_inst_args)
 
             # re_build ground truth and track instances
             gt_instances = Instances((1,1), boxes=gt_box, obj_ids=gt_obj_ids, labels=gt_labels)
-            track_instances = TrackInstances(vars(self.args), init=False, _idxs=[tr_id1,tr_id2])
+            track_instances2 = TrackInstances(vars(self.args), init=False, _idxs=track_instances._idxs)
             for k,v in zip(tr_keys, tr_inst_args):
-                track_instances._fields[k] = v
+                track_instances2._fields[k] = v
 
             # forward
-            loss_dict, track_instances = self.forward_frame_train(exemplars, frame, gt_instances, mask, track_instances)
-            tmp.append((loss_dict, track_instances))
+            loss_dict, track_instances2 = self.forward_frame_train(exemplars, frame, gt_instances, mask, track_instances2)
+            tmp.append((loss_dict, track_instances2))
 
             # return tuple of tensors we are interested in calling backward on
-            asd = decompose_output([loss_dict, track_instances.q_ref, track_instances.q_emb])
+            asd = decompose_output([loss_dict, track_instances2.q_ref, track_instances2.q_emb])
             return asd
 
         CheckpointFunction.apply(ckpt_fn, len(args), *args, *params)

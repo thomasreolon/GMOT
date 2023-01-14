@@ -39,6 +39,8 @@ def train_one_epoch(model: torch.nn.Module,
     for d_i, data_dict in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         data_dict = utils.data_dict_to_cuda(data_dict, device)
 
+        # import GPUtil; GPUtil.showUtilization()
+
         # Forward
         loss_dict = model(data_dict)
 
