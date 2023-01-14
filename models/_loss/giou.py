@@ -5,9 +5,9 @@ from util.misc import box_cxcywh_to_xyxy
 
 def lossfn_giou(output, target, outputs, targets, i):
     n_prop = len(output['matching_gt'])
-    nois_gt = output['position'][:,:,n_prop:]
+    nois_gt = output['boxes'][:,:,n_prop:]
 
-    pred, sorted_target = matching_preds_gt(output['matching_gt'], output['position'], target)
+    pred, sorted_target = matching_preds_gt(output['matching_gt'], output['boxes'], target)
 
     loss = giou(pred, sorted_target.boxes)      # loss
     if nois_gt.numel() > 0:

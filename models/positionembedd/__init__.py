@@ -61,20 +61,17 @@ class GeneralPositionEmbedder(nn.Module):
 
         track_instances = TrackInstances.cat([pre_gt, new_gt])
 
-        assert tmp == len(tmp)
+        assert tmp == len(track_instances)
 
         return multiscale_img_feats, track_instances
 
-    def make_queries(self, q, q_ref, confidences, fuser):
-        if q is None: return None
-
-        b,n,c = q.shape
-        q_pos = self.embedder.get_q_pos(q_ref.view(b*n, 4), confidences=confidences)
-        q = fuser(q.view(b*n, -1), q_pos)
-        return q.view(b,n,c)
+    def make_queries(self, q_emb, q_ref, confidences, fuser):
+        if q_emb is None: return None
+        q_pos = self.embedder.get_q_pos(q_ref, confidences=confidences)
+        q_emb = fuser(q_emb, q_pos)
+        return q_emb
 
     def make_features(self, msf):
         poss = [self.embedder.get_fmap_pos(img) for img in msf]
-        msf = [self.fuser(f, f_pos,0) for f, f_pos in zip(msf, poss)]
+        msf = [self.fuser_new(f, f_pos) for f, f_pos in zip(msf, poss)]
         return msf
-        

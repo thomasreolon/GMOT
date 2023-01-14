@@ -58,8 +58,9 @@ def get_args_parser():
 
     # * Mixer
     parser.add_argument('--mix_return', default=['ch','q','feat'], type=str, nargs='+', help="what to return from mixer")
-    parser.add_argument('--mix_arch', default='motr', type=str,         help="what to return from mixer")
+    parser.add_argument('--mix_arch',   default='motr', type=str,            help="what to return from mixer")
     parser.add_argument('--q_extractor', default='circle', type=str,         help="how to go from exemplar feature maps to less queries (avg, multiple)")
+    parser.add_argument('--use_learned', action='store_true',                help="query embeddings from image features or from fixed-learned Embedding")
 
     # * Position Embedding
     parser.add_argument('--position_embedding', default='gauss_cat', type=str, 
@@ -84,6 +85,9 @@ def get_args_parser():
 
     # LOSS
     # * Matcher
+    parser.add_argument('--matcher', default='simple', type=str,            help="hugarian(costMatrix) / simple(closest)")
+
+
     parser.add_argument('--mix_match', action='store_true',)
     parser.add_argument('--set_cost_class', default=2, type=float,          help="Class coefficient in the matching cost")
     parser.add_argument('--set_cost_bbox', default=5, type=float,           help="L1 box coefficient in the matching cost")

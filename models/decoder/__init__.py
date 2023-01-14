@@ -16,5 +16,7 @@ class GeneralDecoder(nn.Module):
         self.args = args
         self.decoder = get_main_decoder(args.dec_name, args)
 
-    def forward(self, *a, **b):
-        return self.decoder(*a, **b)
+    def forward(self, img_features, add_keys, track_instances_pos, attn_mask, img_masks):
+        q_emb = track_instances_pos.q_emb[None]
+        q_ref = track_instances_pos.q_ref[None]
+        return self.decoder(img_features, add_keys, q_emb, q_ref, attn_mask, img_masks)

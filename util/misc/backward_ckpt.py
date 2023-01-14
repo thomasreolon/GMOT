@@ -1,4 +1,5 @@
 import torch
+import random
 
 def decompose_output(element, first=True):
     # return all the tensor in the dict
@@ -31,8 +32,10 @@ class CheckpointFunction(torch.autograd.Function):
         ctx.run_function = run_function
         ctx.input_tensors = list(args[:length])
         ctx.input_params = list(args[length:])
+        ctx.rand_seed = random.randint(0,99999)
         with torch.no_grad():
             # forward without grad
+            torch.manual_seed(ctx.rand_seed)
             output_tensors = ctx.run_function(*ctx.input_tensors)
         return output_tensors
 
@@ -46,6 +49,7 @@ class CheckpointFunction(torch.autograd.Function):
                 ctx.input_tensors[i].requires_grad = temp.requires_grad
         to_autograd = list(filter(check_require_grad, ctx.input_tensors))
         with torch.enable_grad():
+            torch.manual_seed(ctx.rand_seed)
             # forward with grad --> can call .backward() for that section
             output_tensors = ctx.run_function(*ctx.input_tensors)
         output_tensors, output_grads = zip(*filter(lambda t: t[0].requires_grad, zip(output_tensors, output_grads)))

@@ -31,8 +31,8 @@ class GeneralMixer(nn.Module):
         if q_ref is None:
             # learned queries when they are not provided by the mixer
             self.ref_pts = nn.Embedding(args.num_queries, 4)
-            if args.use_learned:
-                self.q_embed = nn.Embedding(args.num_queries, args.embedd_dim) #TODO: if args.learned
+        if args.use_learned:
+            self.q_embed = nn.Embedding(args.num_queries, args.embedd_dim) #TODO: if args.learned
     
     @torch.no_grad()
     def _init_weights(self):
@@ -65,19 +65,20 @@ class GeneralMixer(nn.Module):
 
 
     def update_track_instances(self, img_features:List[Tensor], q_prop_refp:Tensor, track_instances:TrackInstances, noised_gt:Tensor):
+        dev = track_instances.q_emb.device
         # queries to detect new tracks
         if q_prop_refp is None:
             q_prop_refp = self.ref_pts.weight.data.sigmoid()
-
+        
         if self.args.use_learned: # learned embeddings (MOTR LIKE)
             q_prop_emb  = self.q_embed.weight.data
         else:
-            q_prop_emb  = self.make_q_from_ref(q_prop_refp[0], img_features)
+            q_prop_emb  = self.make_q_from_ref(q_prop_refp, img_features)
 
         # queries used to help learning
-        if noised_gt is not None:
-            q_gt_refp = torch.zeros((0, 4))
-            q_gt_emb  = torch.zeros((0, q_prop_emb.shape[1]))
+        if noised_gt is None:
+            q_gt_refp = torch.zeros((0, 4), device=dev)
+            q_gt_emb  = torch.zeros((0, q_prop_emb.shape[1]),device=dev)
         else:
             q_gt_refp = noised_gt.clamp(0,0.9998)
             q_gt_emb  = self.make_q_from_ref(q_gt_refp, img_features)
@@ -87,10 +88,10 @@ class GeneralMixer(nn.Module):
         track_instances.add_new(q_gt_emb, q_gt_refp, is_gt=True)
 
         # attn_mask
-        n_pre, n_tot = track_instances._idxs
-        attn_mask = torch.zeros((n_tot, n_tot), dtype=bool, device=track_instances.q_emb.device)
-        attn_mask[:n_tot, n_tot:] = True     # proposed cannot see ground truth
-        attn_mask[n_tot:, :n_pre] = True     # ground truth cannot see queries we know are good
+        n_pre, n_q, n_tot = *track_instances._idxs, len(track_instances)
+        attn_mask = torch.zeros((n_tot, n_tot), dtype=bool, device=dev)
+        attn_mask[:n_q, n_q:] = True     # proposed cannot see ground truth
+        attn_mask[n_q:, :n_pre] = True     # ground truth cannot see queries we know are good
 
         return attn_mask
 

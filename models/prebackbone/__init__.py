@@ -27,3 +27,14 @@ class GeneralPreBackbone(torch.nn.Module):
 
     def forward(self, x):
         return self.body(x)
+
+    def _fix_pad(self, coord, mask):
+        """the prediction are relative to the padded input tensor, this accounts for the translation wrt the original image"""
+        if mask.int().sum() == 0: return coord # no padding done
+        _,h,w = mask.shape
+        nh,nw = h-mask[0,:,w//2].int().sum(), w-mask[0,h//2].int().sum()
+        padt, padl = mask[0,:h//2, w//2].int().sum(), mask[0,h//2,:w//2].int().sum()
+        coord_xy = coord[...,:2] - torch.tensor([padl/w, padt/h], device=coord.device)
+        coord = torch.cat((coord_xy, coord[...,2:]), dim=-1)
+        coord = coord * torch.tensor([w/nw, h/nh, w/nw, h/nh], device=coord.device)
+        return coord

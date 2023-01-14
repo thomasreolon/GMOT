@@ -66,7 +66,7 @@ class Visualizer():
         # info needed on that frame
         frame = frames[num].unsqueeze(0)
         q_ref = outputs[num]['q_ref'].cpu()
-        coord = outputs[num]['position'].cpu()
+        coord = outputs[num]['boxes'].cpu()
         isobj = outputs[num]['is_object'].cpu()
         n_prop = q_ref.shape[1] - len(gt[num])
 

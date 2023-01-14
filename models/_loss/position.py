@@ -5,9 +5,9 @@ from util.misc import box_cxcywh_to_xyxy
 def lossfn_position(output, target, outputs, targets, i):
     """L1 loss between predicted and real"""
     n_prop = len(output['matching_gt'])
-    nois_gt = output['position'][:,:,n_prop:]
+    nois_gt = output['boxes'][:,:,n_prop:]
 
-    pred, sorted_target = matching_preds_gt(output['matching_gt'], output['position'], target)
+    pred, sorted_target = matching_preds_gt(output['matching_gt'], output['boxes'], target)
 
     loss = position(pred, sorted_target.boxes)      # loss
     if nois_gt.numel() > 0:

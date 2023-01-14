@@ -48,39 +48,9 @@ def set_seed(seed):
     numpy.random.seed(seed)
     random.seed(seed)
 
-
-
-# def _max_by_axis(the_list):
-#     # type: (List[List[int]]) -> List[int]
-#     maxes = the_list[0]
-#     for sublist in the_list[1:]:
-#         for index, item in enumerate(sublist):
-#             maxes[index] = max(maxes[index], item)
-#     return maxes
-
-
-# def nested_tensor_from_tensor_list(tensor_list: List[Tensor], size_divisibility: int = 0):
-#     # TODO make this more general
-#     if tensor_list[0].ndim == 3:
-#         # TODO make it support different-sized images
-
-#         max_size = _max_by_axis([list(img.shape) for img in tensor_list])
-#         if size_divisibility > 0:
-#             stride = size_divisibility
-#             # the last two dims are H,W, both subject to divisibility requirement
-#             max_size[-1] = (max_size[-1] + (stride - 1)) // stride * stride
-#             max_size[-2] = (max_size[-2] + (stride - 1)) // stride * stride
-
-#         # min_size = tuple(min(s) for s in zip(*[img.shape for img in tensor_list]))
-#         batch_shape = [len(tensor_list)] + max_size
-#         b, c, h, w = batch_shape
-#         dtype = tensor_list[0].dtype
-#         device = tensor_list[0].device
-#         tensor = torch.zeros(batch_shape, dtype=dtype, device=device)
-#         mask = torch.ones((b, h, w), dtype=torch.bool, device=device)
-#         for img, pad_img, m in zip(tensor_list, tensor, mask):
-#             pad_img[: img.shape[0], : img.shape[1], : img.shape[2]].copy_(img)
-#             m[: img.shape[1], :img.shape[2]] = False
-#     else:
-#         raise ValueError('not supported')
-#     return NestedTensor(tensor, mask)
+class smartdict(dict):
+    def __init__(self, required:set, *a, **kw):
+        self._required = required
+        super().__init__(*a, **kw)
+    def update(self, new_dict:dict):
+        super().update({k:v for k,v in new_dict.items() if k in self._required})

@@ -18,7 +18,7 @@ def load_labels(txt_path):
     data = np.genfromtxt(txt_path, delimiter=',', dtype=np.int)
 
     for line in data:
-        gt[line[0]].append( [line[2], line[3], line[2]+line[4], line[3]+line[5], line[1], 0] )
+        gt[line[0]].append( [line[2], line[3], line[2]+line[4], line[3]+line[5], line[1]] )
     return gt
 
 def get_images(video_name, d):

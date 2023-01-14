@@ -227,7 +227,7 @@ class TrackInstances(Instances):
     def add_new(self, q_prop_emb, q_prop_refp, is_gt=False):
         n, _ = q_prop_emb.shape
         d = self.q_emb.device
-        l = self._keep_for * int(is_gt) 
+        l = self._keep_for * int(is_gt)
 
         self._fields['q_emb'] = torch.cat((self.q_emb, q_prop_emb), dim=0)
         self._fields['q_ref'] = torch.cat((self.q_ref, q_prop_refp), dim=0)
@@ -238,37 +238,45 @@ class TrackInstances(Instances):
 
         if not is_gt:
             self._idxs[1] = len(self)
-        
-    def get_tracks_next_frame(self, refs, emb):
+
+    def get_tracks_next_frame(self, refs, emb, score):
+        # drop GT queries
+        new_prev = self.get_prevnew_queries()
+        n = len(new_prev)
+
         # output becomes new frame's input
-        self.q_ref = refs[-1,0,:,:]
-        self.q_emb = emb[-1,0,:,:]
+        new_prev.q_ref = refs[-1,0,:n,:]
+        new_prev.q_emb = emb[-1,0,:n,:]
+        new_prev.score = score[-1,0,:n,0].sigmoid()
 
         # possible detections
-        threshold = self.score.mean() + self.score.std()
-        threshold = max(threshold, self._conf_thresh)
-        good_score = self.score > threshold
+        threshold = new_prev.score.mean() + new_prev.score.std()
+        threshold = max(threshold, new_prev._conf_thresh)
+        good_score = new_prev.score > threshold
+
 
         # assigned by matcher
-        assigned = self.gt_idx >= 0
+        assigned = new_prev.gt_idx >= 0
 
         # memory queries
-        old_tracks = self.lives > 0
+        old_tracks = new_prev.lives > 0
 
         # update
-        self.lives[good_score | assigned] = (self._keep_for * self.score).int()[good_score | assigned]
+        lives_coeff = new_prev._keep_for * (new_prev.score-threshold) / (1-threshold)
+        new_prev.lives[good_score | assigned] = (2+ lives_coeff[good_score | assigned]).clamp(0).int()
         keep = good_score | assigned | old_tracks
-        for k in self._fields:
-            self._fields[k] = self._fields[k][keep]
+        for k in new_prev._fields:
+            new_prev._fields[k] = new_prev._fields[k][keep]
 
-        self.lives -= 1
-        self._idxs[0] = len(self)
-        return self.get_prevnew_queries()
+        new_prev.lives -= 1
+        new_prev._idxs = [len(new_prev), len(new_prev)]
+        return new_prev
 
     #           (     from previous frame     )  (         new detection queries          )  (    gt queries    )
     # q_emb = [ size(256), size(256), size(256), size(256), size(256), size(256), size(256), size(256), size(256) ]
     # self._idxs = [3, 7]
     def get_prev_queries(self):
+        #TODO: update _idx..  self.__getitem__(slice(0,self._idxs[0]), _idx=[self._idxs[0],self._idxs[0]])    --> and cat()
         return self[:self._idxs[0]]
     def get_new_queries(self):
         return self[self._idxs[0]:self._idxs[1]]

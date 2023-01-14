@@ -21,5 +21,6 @@ from ._other import (
     set_seed,           # set random seed
     inverse_sigmoid,    # inverse_sigmoid
     mot_collate_fn,     # used to collate stuff in datasets
-    print_time_from     # timestamps between epochs
+    print_time_from,    # timestamps between epochs
+    smartdict,          # .update function little different
 )
