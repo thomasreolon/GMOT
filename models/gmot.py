@@ -4,7 +4,6 @@ GMOT-DETR model and criterion classes.
 import gc
 import torch
 from torch import nn, Tensor
-import GPUtil
 
 from util.misc import CheckpointFunction, decompose_output, TrackInstances, Instances, smartdict
 
@@ -71,18 +70,14 @@ class GMOT(torch.nn.Module):
         
         # iterate though all frames
         for frame, gt_inst, mask in zip(data['imgs'], data['gt_instances'], data['masks']):
-            
-            GPUtil.showUtilization()
-
-            # loss_dict, track_instances = \
-            process_frame_fn(exemplars, frame.unsqueeze(0), gt_inst, mask, track_instances)
-            # losses.append(loss_dict)
+            loss_dict, track_instances = process_frame_fn(exemplars, frame.unsqueeze(0), gt_inst, mask, track_instances)
+            losses.append(loss_dict)
             gc.collect(); torch.cuda.empty_cache()
             break
 
-        # loss_dict = self.criterion.forward_inter_frame(losses)
+        loss_dict = self.criterion.forward_inter_frame(losses)
         
-        # return loss_dict
+        return loss_dict
 
 
     def forward_frame_train(self, exemplars:Tensor, frame:Tensor, gt_inst:Instances, mask:Tensor, track_instances:TrackInstances):
@@ -158,7 +153,7 @@ class GMOT(torch.nn.Module):
             return asd
 
         CheckpointFunction.apply(ckpt_fn, len(args), *args, *params)
-        return tmp#[0]
+        return tmp[0]
 
     def noise_gt(self, boxes):
         rand_coeff = max(0.05, (100-len(boxes)) / 100) * 0.1

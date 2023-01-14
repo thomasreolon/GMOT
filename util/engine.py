@@ -14,8 +14,6 @@ import gc
 import sys
 import numpy as np
 
-import GPUtil
-
 import torch
 
 import util.multiprocess as utils
@@ -41,37 +39,8 @@ def train_one_epoch(model: torch.nn.Module,
     for d_i, data_dict in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         data_dict = utils.data_dict_to_cuda(data_dict, device)
 
-
-        mem = torch.cuda.memory_snapshot()
-        tot=[]
-        for b_type in mem:
-            tot += [x['size'] for x in b_type['blocks'] if x['state']=='active_allocated']
-        print('allocations=',len(tot),     ' mem=',sum(tot)/1024**3)
-        GPUtil.showUtilization()
-
-        import json
-        objs = {'cpu':0, 'params':0}
-        for obj in gc.get_objects():
-            try:
-                if isinstance(obj, torch.Tensor):
-                    if str(obj.device) == 'cpu':
-                        objs['cpu'] += 1
-                    else:
-                        if isinstance(obj, torch.nn.parameter.Parameter):
-                            objs['params'] += 1
-                        else:
-                            if str(obj.shape)=='torch.Size([])': 
-                                print(obj)
-                            if str(obj.shape) not in objs: objs[str(obj.shape)] = 1
-                            else: objs[str(obj.shape)] +=1
-            except:
-                pass
-        print(json.dumps(objs, indent=1))
-
         # Forward
         loss_dict = model(data_dict)
-        input()
-        continue
 
         # Compute Loss
         losses = sum(loss_dict.values())
