@@ -2,18 +2,16 @@ import torch
 from ._loss_utils import matching_preds_gt, multiplier_decoder_level
 from util.misc import box_cxcywh_to_xyxy
 
-def lossfn_position(output, target, outputs, targets, i):
+def lossfn_position(track_instances, output, gt_instance):
     """L1 loss between predicted and real"""
-    n_prop = len(output['matching_gt'])
-    nois_gt = output['boxes'][:,:,n_prop:]
 
-    pred, sorted_target = matching_preds_gt(output['matching_gt'], output['boxes'], target)
+    pred, sorted_target = matching_preds_gt(track_instances.gt_idx, output['boxes'], gt_instance)
 
     loss = position(pred, sorted_target.boxes)      # loss
-    if nois_gt.numel() > 0:
-        loss = loss + position(nois_gt, target.boxes) # "teaching" loss
-
     return multiplier_decoder_level(loss).mean()
+
+lossfn_position.is_intra_loss = True
+lossfn_position.required = ['boxes']
 
 
 

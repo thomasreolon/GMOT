@@ -40,17 +40,17 @@ class SinCosEmbedder(torch.nn.Module):
         pos_y = y_embed[:, :, :, None] / dim_t
         pos_x = torch.stack((pos_x[:, :, :, 0::2].sin(), pos_x[:, :, :, 1::2].cos()), dim=4).flatten(3)
         pos_y = torch.stack((pos_y[:, :, :, 0::2].sin(), pos_y[:, :, :, 1::2].cos()), dim=4).flatten(3)
-        pos = torch.cat((pos_x, pos_y), dim=3).permute(0, 3, 1, 2)
+        pos = torch.cat((pos_x, pos_y), dim=3).permute(0, 3, 1, 2).to(feat_map.device)
         return pos
 
     @torch.no_grad()
     def get_q_pos(self, ref_pts, confidences=None):
         if len(ref_pts.shape)==3: ref_pts=ref_pts[0]
-        size = self.size //2 -1
+        size = self.size //2
 
         conf = torch.stack((confidences, ((ref_pts-1)**2).sum(-1)), dim=-1) # needed to find a way to use confidence..
 
-        dim_t = torch.arange(size, dtype=torch.float32)
+        dim_t = torch.arange(size, dtype=torch.float32, device=ref_pts.device)
         dim_t = self.temperature ** (2 * dim_t.div(2, rounding_mode="trunc") / size)
 
         y_embed = ref_pts[:,1]
@@ -64,7 +64,7 @@ class SinCosEmbedder(torch.nn.Module):
         pos_y = y_embed.view(N, 1) / dim_t.view(1,-1)
         pos_x = torch.stack((pos_x[:, 0::2].sin(), pos_x[:, 1::2].cos()), dim=2).flatten(1)
         pos_y = torch.stack((pos_y[:, 0::2].sin(), pos_y[:, 1::2].cos()), dim=2).flatten(1)
-        pos = torch.cat((pos_x, pos_y, conf), dim=1)
+        pos = torch.cat((pos_x[:,:-1], pos_y[:,:-1], conf), dim=1)
         return pos
 
 

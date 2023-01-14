@@ -4,6 +4,8 @@ import numpy as np
 import os
 
 class Visualizer():
+    required = ['frame','q_ref','boxes','is_object','gtboxes','matching_gt','input_hs','img_features_pos']
+
     def __init__(self, args) -> None:
         self.args = args
         os.makedirs(self.args.output_dir+'/debug/', exist_ok=True)
@@ -57,31 +59,27 @@ class Visualizer():
         cv2.imwrite(out_d+'/debug/gt_visualize.jpg', imgs)
 
     @torch.no_grad()
-    def visualize_infographics(self, frames, gt, outputs, num, path):
-        os.makedirs(self.args.output_dir+'/debug/'+path.split('/')[-2], exist_ok=True)
-        # where to save the file
-        if num==-1: num = len(frames)-1
-        path = path+f'f{num}_'
+    def visualize_infographics(self, outputs, path):
+        os.makedirs(self.args.output_dir+'/debug/'+'/'.join(path.split('/')[:-1]), exist_ok=True)
 
         # info needed on that frame
-        frame = frames[num].unsqueeze(0)
-        q_ref = outputs[num]['q_ref'].cpu()
-        coord = outputs[num]['boxes'].cpu()
-        isobj = outputs[num]['is_object'].cpu()
-        n_prop = q_ref.shape[1] - len(gt[num])
+        frame = outputs['frame']
+        q_ref = outputs['q_ref'][None]
+        coord = outputs['boxes']
+        isobj = outputs['is_object']
+        n_prop = q_ref.shape[1] - len(outputs['gtboxes'])
 
-        assignments = outputs[num]['debug'].cpu()
-        matching = outputs[num]['matching_gt'].cpu()
-        gt_boxes = gt[num].boxes
+        matching = outputs['matching_gt'][:n_prop]
+        gt_boxes = outputs['gtboxes']
 
-        queries = outputs[num]['input_hs'].cpu()
-        img_features = [i.cpu() for i in outputs[num]['img_features_pos']]
+        queries = outputs['input_hs'][None]
+        img_features = [i.cpu() for i in outputs['img_features_pos']]
 
         # helper functions for graphics
         self.debug_q_similarity(queries, img_features, q_ref, n_prop, path)
         self.debug_matching(frame, coord[-1], gt_boxes, matching, n_prop, path)
         self.debug_qref_steps(frame, q_ref, coord, isobj, n_prop, path)
-        self.debug_predictions(frame, coord[-1], assignments, path)
+        # self.debug_predictions(frame, coord[-1], path)
         self.debug_qref_start(frame, q_ref, n_prop, path)
     
     def debug_q_similarity(self, queries, img_features, q_ref, n_prop, path):

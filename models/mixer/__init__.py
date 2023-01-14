@@ -33,6 +33,7 @@ class GeneralMixer(nn.Module):
             self.ref_pts = nn.Embedding(args.num_queries, 4)
         if args.use_learned:
             self.q_embed = nn.Embedding(args.num_queries, args.embedd_dim) #TODO: if args.learned
+            self.q_embed_gt = nn.Embedding(args.num_queries, args.embedd_dim) #TODO: if args.learned
     
     @torch.no_grad()
     def _init_weights(self):
@@ -81,7 +82,10 @@ class GeneralMixer(nn.Module):
             q_gt_emb  = torch.zeros((0, q_prop_emb.shape[1]),device=dev)
         else:
             q_gt_refp = noised_gt.clamp(0,0.9998)
-            q_gt_emb  = self.make_q_from_ref(q_gt_refp, img_features)
+            if self.args.use_learned:
+                q_gt_emb  = self.q_embed_gt.weight.data[:len(noised_gt)]
+            else:
+                q_gt_emb  = self.make_q_from_ref(q_gt_refp, img_features)
 
         # add queries to detect new tracks to track_instances
         track_instances.add_new(q_prop_emb, q_prop_refp)

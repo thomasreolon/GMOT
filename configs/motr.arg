@@ -1,0 +1,8 @@
+--backbone resnet50
+--num_feature_levels 4
+--mix_arch motr
+--use_learned
+--position_embedding sin_sum
+--dec_name base
+--dec_layers 6
+--nheads 8

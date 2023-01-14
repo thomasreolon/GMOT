@@ -49,8 +49,32 @@ def set_seed(seed):
     random.seed(seed)
 
 class smartdict(dict):
-    def __init__(self, required:set, *a, **kw):
+    def __init__(self, required:set, detach=False, *a, **kw):
         self._required = required
+        self._detach = detach
         super().__init__(*a, **kw)
     def update(self, new_dict:dict):
+        if self._detach: new_dict = {k:(v.cpu().detach() if isinstance(v,Tensor) else v) for k,v in new_dict.items()}
         super().update({k:v for k,v in new_dict.items() if k in self._required})
+
+def get_info(model):
+    import gc, json
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print( name, param.data.view(-1)[[0,-1]])
+    objs = {'cpu':0, 'params':0}
+    for obj in gc.get_objects():
+        try:
+            if isinstance(obj, torch.Tensor):
+                if str(obj.device) == 'cpu':
+                    objs['cpu'] += 1
+                else:
+                    if isinstance(obj, torch.nn.parameter.Parameter):
+                        objs['params'] += 1
+                    elif str(obj.shape) not in objs: objs[str(obj.shape)] = 1
+                    else: objs[str(obj.shape)] +=1
+        except:
+            pass
+    print(json.dumps(objs, indent=1))
+    import GPUtil; GPUtil.showUtilization()
+    input()

@@ -3,18 +3,13 @@ from ._loss_utils import matching_preds_gt, multiplier_decoder_level
 from util.misc import box_cxcywh_to_xyxy
 
 
-def lossfn_giou(output, target, outputs, targets, i):
-    n_prop = len(output['matching_gt'])
-    nois_gt = output['boxes'][:,:,n_prop:]
-
-    pred, sorted_target = matching_preds_gt(output['matching_gt'], output['boxes'], target)
-
+def lossfn_giou(track_instances, output, gt_instance):
+    pred, sorted_target = matching_preds_gt(track_instances.gt_idx, output['boxes'], gt_instance)
     loss = giou(pred, sorted_target.boxes)      # loss
-    if nois_gt.numel() > 0:
-        loss = loss + giou(nois_gt, target.boxes) # "teaching" loss
-
     return multiplier_decoder_level(loss).mean()
 
+lossfn_giou.is_intra_loss = True
+lossfn_giou.required = ['boxes']
 
 
 def giou(pred_box, tgt_box):

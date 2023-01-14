@@ -286,3 +286,10 @@ class TrackInstances(Instances):
         return self[:self._idxs[1]]
     def get_newgt_queries(self):
         return self[self._idxs[0]:]
+
+    def __str__(self) -> str:
+        s = self.__class__.__name__ + "("
+        s += "num_instances={}, ".format(len(self))
+        s += "idxs=[{}])".format(self._idxs)
+        s += "fields=[{}])".format(", ".join((f"{k}: {v}" for k, v in self._fields.items())))
+        return s

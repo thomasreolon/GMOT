@@ -17,7 +17,6 @@ import numpy as np
 import torch
 
 import util.multiprocess as utils
-from .misc import Visualizer
 
 # TODO: batchsize
 # TODO: in main: fn "change params between epochs"   t=[t1,t2,t3,t2,t1];  new_p=t[int(len(t)*epoch/n_epochs)]  ;  set_param(new_p)
@@ -29,20 +28,20 @@ def train_one_epoch(model: torch.nn.Module,
     model.train()
 
     # Set Up Logger
-    visualizer = Visualizer(args)
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Epoch: [{}]'.format(epoch)
-    print_freq = 20
+    print_freq = 5
     half = len(data_loader)//2 + np.random.randint(len(data_loader)//2)
 
     # for samples, targets in metric_logger.log_every(data_loader, print_freq, header):
     for d_i, data_dict in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+        di_debug = debug+f'b{d_i}_' if debug and (d_i==half or d_i==0 or d_i==300) else None
+
+        # To cuda
         data_dict = utils.data_dict_to_cuda(data_dict, device)
 
-        # import GPUtil; GPUtil.showUtilization()
-
         # Forward
-        loss_dict = model(data_dict)
+        loss_dict = model(data_dict, debug=di_debug)
 
         # Compute Loss
         losses = sum(loss_dict.values())
@@ -66,14 +65,10 @@ def train_one_epoch(model: torch.nn.Module,
         optimizer.step()
 
         # # Log
-        # metric_logger.update(loss=loss_value, **{k:v for k,v in loss_dict_reduced.items()})
-        if debug and (d_i==half or d_i==2 or d_i==300):
+        metric_logger.update(loss=loss_value, **{k:v for k,v in loss_dict_reduced.items()})
+        if debug and d_i == 0:
             # Sequence of 5 frames from the same video (show GT for debugging)
-            visualizer.visualize_gt(data_dict)
-
-            # Info on what is happening inside the model
-            for i in [0,-1]:#range(len(data_dict['imgs'])):
-                visualizer.visualize_infographics(data_dict['imgs'], data_dict['gt_instances'], outputs, i, debug+f'b{d_i}_')
+            model.visualizer.visualize_gt(data_dict)
 
         # # empty cache
         del loss_dict, data_dict, losses

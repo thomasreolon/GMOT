@@ -2,18 +2,13 @@ import torch
 from ._loss_utils import multiplier_decoder_level, matching_preds_gt
 
 
-def lossfn_is_object(output, target, outputs, targets, i):
+def lossfn_is_object(track_instances, output, gt_instance):
     """focal loss, probability there is an object"""
-    n_prop = len(output['matching_gt'])
-    prob = output['is_object']
-    nois_gt = prob[:,:,n_prop:]
 
-    pos, _ = matching_preds_gt(output['matching_gt'], prob)   # should predict isobj=1
-    neg, _ = matching_preds_gt(~output['matching_gt'], prob)   # should predict isobj=0
+    pos, _ = matching_preds_gt(track_instances.gt_idx, output['is_object'])   # should predict isobj=1
+    neg, _ = matching_preds_gt(~track_instances.gt_idx, output['is_object'])   # should predict isobj=0
 
     loss = isobj(pos.sigmoid(), True) + isobj(neg.sigmoid(), False)      # loss
-    if nois_gt.numel() > 0:
-        loss = loss + isobj(nois_gt.sigmoid(), True)   # "teaching" loss should predict isobj=1
 
     # stronger gradient
     if pos.numel()>0 and neg.numel()>0:
@@ -24,6 +19,8 @@ def lossfn_is_object(output, target, outputs, targets, i):
 
     return multiplier_decoder_level(loss).mean()
 
+lossfn_is_object.is_intra_loss = True
+lossfn_is_object.required = ['is_object']
 
 def isobj(pred, positive, alpha=0.8, gamma=2.0):
     if pred.numel()==0: return torch.zeros(*pred.shape[:-2],1,1,device=pred.device)

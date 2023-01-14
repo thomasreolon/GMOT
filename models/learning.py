@@ -27,10 +27,10 @@ class Criterion(nn.Module):
         self.args = args
         self.matcher = get_matcher(args)
         self.losses = {
-            # 'is_object':4,    # FOCAL_LOSS: if there is an object or no 
-            # 'boxes':5,     # L1_LOSS: position of bounding boxes
-            # 'giou':.5,        # IntersectionOverUnion: position of bounding boxes (generalized)
-            'fake':.5,         # output to 0
+            'is_object':1,    # FOCAL_LOSS: if there is an object or no 
+            'boxes':1,     # L1_LOSS: position of bounding boxes
+            'giou':.2,        # IntersectionOverUnion: position of bounding boxes (generalized)
+            # 'fake':.5,         # output to 0
 
         } # TODO: select losses as args parameter
         self.required = set(self.matcher.required+sum([loss_fn_getter(loss).required for loss in self.losses], []))
