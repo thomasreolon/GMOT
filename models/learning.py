@@ -29,7 +29,7 @@ class Criterion(nn.Module):
         self.losses = {
             'is_object':1,    # FOCAL_LOSS: if there is an object or no 
             'boxes':1,     # L1_LOSS: position of bounding boxes
-            'giou':.2,        # IntersectionOverUnion: position of bounding boxes (generalized)
+            # 'giou':.2,        # IntersectionOverUnion: position of bounding boxes (generalized)
             # 'fake':.5,         # output to 0
 
         } # TODO: select losses as args parameter

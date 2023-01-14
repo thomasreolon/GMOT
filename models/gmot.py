@@ -129,7 +129,7 @@ class GMOT(torch.nn.Module):
         return loss_dict, track_instances
 
     def noise_gt(self, boxes):
-        rand_coeff = max(0.05, (100-len(boxes)) / 100) * 0.1
+        rand_coeff = max(0.05, (100-len(boxes)) / 100) * 0.06
         return boxes + torch.rand_like(boxes)*rand_coeff -rand_coeff/2
 
     def _forward_frame_train_ckpt(self, exemplars, frame, gt_inst:Instances, mask:Tensor, track_instances:TrackInstances):
