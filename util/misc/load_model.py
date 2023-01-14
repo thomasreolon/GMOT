@@ -1,5 +1,6 @@
 import torch
-
+import os
+from ..multiprocess import data_dict_to_cuda
 
 def load_checkpoint(args, model, optimizer, lr_scheduler):
     # load only weights
@@ -8,36 +9,32 @@ def load_checkpoint(args, model, optimizer, lr_scheduler):
 
     # special case: load last checkpoint
     if args.resume=='':
-        args.resume = args.output_dir + '/checkpoint.pth'
+        tmp = args.output_dir + '/checkpoint.pth'
+        args.resume = tmp if os.path.exists(tmp) else None
 
     # load weights and more
     args.start_epoch = 0
     if args.resume is not None:
-        checkpoint = torch.load(args.resume, map_location='cpu')
-        missing_keys, unexpected_keys = model.load_state_dict(checkpoint['model'], strict=False)
-        unexpected_keys = [k for k in unexpected_keys if not (k.endswith('total_params') or k.endswith('total_ops'))]
-        if len(missing_keys) > 0:
-            print('Missing Keys: {}'.format(missing_keys))
-        if len(unexpected_keys) > 0:
-            print('Unexpected Keys: {}'.format(unexpected_keys))
+        print(f'resuming ...')
+        checkpoint = load_model(model, args.resume)
+
         if 'optimizer' in checkpoint and 'lr_scheduler' in checkpoint and 'epoch' in checkpoint:
             import copy
             p_groups = copy.deepcopy(optimizer.param_groups)
-            optimizer.load_state_dict(checkpoint['optimizer'])
+            optimizer.load_state_dict(data_dict_to_cuda(checkpoint['optimizer'], args.device))
             for pg, pg_old in zip(optimizer.param_groups, p_groups):
                 pg['lr'] = pg_old['lr']
                 pg['initial_lr'] = pg_old['initial_lr']
-            # print(optimizer.param_groups)
-            lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
-            lr_scheduler.step_size = args.lr_drop
+
+            lr_scheduler.load_state_dict(data_dict_to_cuda(checkpoint['lr_scheduler'], args.device))
             lr_scheduler.base_lrs = list(map(lambda group: group['initial_lr'], optimizer.param_groups))
             lr_scheduler.step(lr_scheduler.last_epoch)
             args.start_epoch = checkpoint['epoch'] + 1
 
 
 def load_model(model, model_path):
-    checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
-    print(f'loaded {model_path}')
+    checkpoint = torch.load(model_path, map_location='cpu')
+    print(f'loaded pretrained {model_path}')
     state_dict = checkpoint['model']
     model_state_dict = model.state_dict()
 
@@ -70,4 +67,6 @@ def load_model(model, model_path):
             print('No param {}.'.format(k) + msg)
             state_dict[k] = model_state_dict[k]
     model.load_state_dict(state_dict, strict=False)
+
+    return checkpoint
 

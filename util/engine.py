@@ -35,7 +35,7 @@ def train_one_epoch(model: torch.nn.Module,
 
     # for samples, targets in metric_logger.log_every(data_loader, print_freq, header):
     for d_i, data_dict in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
-        di_debug = debug+f'b{d_i}_' if debug and (d_i==half or d_i==0 or d_i==300) else None
+        di_debug = debug+f'b{d_i}_' if debug and (d_i==half or d_i==2 or d_i==300) else None
 
         # To cuda
         data_dict = utils.data_dict_to_cuda(data_dict, device)

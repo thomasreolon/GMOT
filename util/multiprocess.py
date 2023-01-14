@@ -31,7 +31,8 @@ import torch.distributed as dist
 from torch.utils.data.sampler import Sampler
 from torch.utils.data import DataLoader
 
-from .misc import Instances, mot_collate_fn
+from .misc.instance import Instances
+from .misc._other import mot_collate_fn
 
 def init_distributed_mode(args):
     if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
@@ -528,7 +529,7 @@ def data_apply(data, check_func, apply_func):
             elif isinstance(data[k], dict) or isinstance(data[k], list):
                 data_apply(data[k], check_func, apply_func)
             else:
-                raise ValueError()
+                raise ValueError(type(data[k]))
     elif isinstance(data, list):
         for i in range(len(data)):
             if check_func(data[i]):

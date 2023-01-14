@@ -79,7 +79,7 @@ class Visualizer():
         self.debug_q_similarity(queries, img_features, q_ref, n_prop, path)
         self.debug_matching(frame, coord[-1], gt_boxes, matching, n_prop, path)
         self.debug_qref_steps(frame, q_ref, coord, isobj, n_prop, path)
-        # self.debug_predictions(frame, coord[-1], path)
+        self.debug_predictions(frame, outputs['matching_gt'], n_prop, coord[-1], path)
         self.debug_qref_start(frame, q_ref, n_prop, path)
     
     def debug_q_similarity(self, queries, img_features, q_ref, n_prop, path):
@@ -153,9 +153,10 @@ class Visualizer():
                 frame = self._debug_lines(frame, q_refs[i], q_refs[i+1])
             cv2.imwrite(out_file, frame)
 
-    def debug_predictions(self, frame, coord, assign, path):
+    def debug_predictions(self, frame, match, nprop, coord, path):
         """print predicted boundingboxes"""
-        # white=confident; green=gt; purple=old; orange=new;    half_black=not_confident
+        # green=gt; purple=old
+        assign = torch.cat((2*(match[:nprop]>=0).int(), (match[nprop:]>=0).int()))
         out_file = self.args.output_dir+f'/debug/{path}pred.jpg'
         if not os.path.exists(out_file):
             frame = self._debug_frame(frame)
@@ -202,7 +203,7 @@ class Visualizer():
         return frame
 
 
-    def _draw_box(self, frame, box, color_id, border=2):
+    def _draw_box(self, frame, box, color_id, border=1):
         # white=confident; green=gt; purple=old; orange=new;    half_black=not_confident
         ## --> eval predictions: white+full_green+full_orange
         color = [255, (0,255,128),(255,0,255),(0,128,255)] [color_id%10]
@@ -216,7 +217,7 @@ class Visualizer():
         # draw box
         tmp = frame[y1:y2, x1:x2].copy()
         frame[y1-border:y2+border, x1-border:x2+border] = color
-        if color_id<10: frame[y1-border:y2+border, x1:x2] = 0
+        # if color_id<10: frame[y1-border:y2+border, x1:x2] = 0
         frame[y1:y2, x1:x2] = tmp
         return frame
 
