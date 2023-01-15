@@ -32,11 +32,11 @@ def train_one_epoch(model: GMOT,
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Epoch: [{}]'.format(epoch)
     print_freq = 5
-    half = len(data_loader)//2 + np.random.randint(len(data_loader)//2)
+    visualizations = {2, 10, 30, 80, 150, 300, len(data_loader)//2, len(data_loader)*4//5}
 
     # for samples, targets in metric_logger.log_every(data_loader, print_freq, header):
     for d_i, data_dict in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
-        di_debug = debug+f'b{d_i}_' if debug and (d_i==2 or d_i==30 or d_i==150 or d_i==half) else None
+        di_debug = debug+f'b{d_i}_' if debug and d_i in visualizations else None
 
         # To cuda
         data_dict = utils.data_dict_to_cuda(data_dict, device)
@@ -48,7 +48,7 @@ def train_one_epoch(model: GMOT,
         losses = sum(loss_dict.values())
 
         # Reduce losses over all GPUs for logging purposes
-        if d_i%1==0:#print_freq==0:
+        if d_i%print_freq==0:
             loss_dict_reduced = {k: v for k, v in utils.reduce_dict(loss_dict).items()}
             loss_value = sum(loss_dict_reduced.values()).item()
             if not math.isfinite(loss_value):

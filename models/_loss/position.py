@@ -10,9 +10,9 @@ def lossfn_position(track_instances, output, gt_instance):
     pred, sorted_target = matching_preds_gt(track_instances.gt_idx, output['boxes'], gt_instance)
 
     loss = position(pred, sorted_target.boxes)
-    # loss2 = position_step(pred, sorted_target.boxes)
+    loss2 = position_step(pred, sorted_target.boxes)
 
-    return multiplier_decoder_level(loss).mean()  * 100 # + loss2
+    return multiplier_decoder_level(loss).mean()  * 100  + loss2 * 100
 
 lossfn_position.is_intra_loss = True
 lossfn_position.required = ['boxes']
@@ -34,5 +34,5 @@ def position_step(pred_box, tgt_box):
 
     loss = bad_steps * dist[1:]
 
-    return loss.mean(-2) * 100
+    return loss.mean()
 

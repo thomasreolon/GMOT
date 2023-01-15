@@ -1,11 +1,14 @@
 import torch.nn as nn
 import torch
 from .def_transformer import OriginalDefDetr
+from .addkeys import DefAddkeysTransformer
 
 def get_main_decoder(name, args):
     
     if name == 'base':
         return OriginalDefDetr(args)
+    if name == 'addkeys':
+        return DefAddkeysTransformer(args)
     else:
         raise NotImplementedError()
 

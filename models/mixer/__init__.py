@@ -3,6 +3,7 @@ import torch
 from torch import nn, Tensor
 
 from .nothing import LearnedQueries
+from .addkeys import AddKeys
 from util.misc import TrackInstances, inverse_sigmoid
 
 def get_main_mixer(name, num_queries, embedd_dim):
@@ -10,8 +11,8 @@ def get_main_mixer(name, num_queries, embedd_dim):
 
     if name == 'motr':
         return LearnedQueries()
-    if name == '__-':
-        return None
+    if name == 'addkeys':
+        return AddKeys()
     else:
         raise NotImplementedError()
 
@@ -25,7 +26,7 @@ class GeneralMixer(nn.Module):
 
         # if the mixer is not proposing queries they will be learned
         with torch.no_grad():
-            _, q_ref, _ = self.mixer([torch.rand(1,args.embedd_dim,256,256)], [torch.rand(1,args.embedd_dim,64,64)], torch.zeros(1,256,256), {})
+            _, q_ref, _ = self.mixer([torch.rand(1,args.embedd_dim,256,256)], [torch.rand(1,args.embedd_dim,64,64)], torch.zeros(1,1,256,256), {})
         
         self.q_embed, self.ref_pts = None, None
         if q_ref is None:
