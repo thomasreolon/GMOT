@@ -48,7 +48,7 @@ def train_one_epoch(model: GMOT,
         losses = sum(loss_dict.values())
 
         # Reduce losses over all GPUs for logging purposes
-        if d_i%print_freq==0:
+        if d_i%1==0:#print_freq==0:
             loss_dict_reduced = {k: v for k, v in utils.reduce_dict(loss_dict).items()}
             loss_value = sum(loss_dict_reduced.values()).item()
             if not math.isfinite(loss_value):
@@ -57,11 +57,9 @@ def train_one_epoch(model: GMOT,
                 sys.exit(1)
 
         # Backward
-        print('='*100)
-        print(torch.isnan(model.mixer.q_embed.weight).sum(), torch.isnan(model.mixer.ref_pts.weight).sum())
         optimizer.zero_grad()
         losses.backward()
-
+        
         if args.clip_max_norm > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_max_norm)
         else:

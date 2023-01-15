@@ -12,19 +12,7 @@ def lossfn_position(track_instances, output, gt_instance):
     loss = position(pred, sorted_target.boxes)
     # loss2 = position_step(pred, sorted_target.boxes)
 
-    if (torch.isnan(pred).sum()>0):
-        print('aaaaaaaaaaaaaaaaaaaaaaa')
-        if printed.__len__()==0:
-            printed.append(0)
-            print(
-                '| tgt  ',  sorted_target.boxes.mean(),
-                '\n| pred  ', pred.mean(),
-                '\n| ref  ',  track_instances.q_ref.mean(),
-                '\n| emb  ',  track_instances.q_emb.mean(),
-            )
- 
-
-    return multiplier_decoder_level(loss).mean() # + loss2
+    return multiplier_decoder_level(loss).mean()  * 100 # + loss2
 
 lossfn_position.is_intra_loss = True
 lossfn_position.required = ['boxes']
@@ -33,10 +21,7 @@ lossfn_position.required = ['boxes']
 def position(pred_box, tgt_box):
     """in_shapes pred[6,1,N,4] tgt[N,4]"""
     if pred_box.numel()==0: return torch.zeros(*pred_box.shape[:-2],1,1,device=pred_box.device)
-    loss =  (pred_box-tgt_box[None,None]).abs().mean(-2)
-
-
-    return loss
+    return (pred_box-tgt_box[None,None]).abs().mean(-2)
 
 
 def position_step(pred_box, tgt_box):

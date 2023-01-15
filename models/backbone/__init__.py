@@ -37,8 +37,8 @@ class GeneralBackbone(nn.Module):
             new_ch = ch_out[-1]   # +16
             h_dim = (new_ch*2+7) //8 *8
             self.downsampling.append(nn.Sequential(
+                nn.BatchNorm2d(ch_out[-1]),
                 nn.Conv2d(ch_out[-1], h_dim, kernel_size=1),                                              # linear proj of featues
-                nn.GroupNorm(8, h_dim),
                 nn.GELU(),
                 nn.Conv2d(h_dim, new_ch, kernel_size=3, stride=2, dilation=3, padding=3, groups=new_ch),  # longer distance dependencies
                 nn.GELU(),

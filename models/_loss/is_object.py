@@ -17,7 +17,7 @@ def lossfn_is_object(track_instances, output, gt_instance):
         pos, neg = pos/tot, neg/tot
         loss = loss + isobj(pos, True) + isobj(neg, False)
 
-    return multiplier_decoder_level(loss).mean()
+    return multiplier_decoder_level(loss).mean()  * 30
 
 lossfn_is_object.is_intra_loss = True
 lossfn_is_object.required = ['is_object']
@@ -28,7 +28,7 @@ def isobj(pred, positive, alpha=0.8, gamma=2.0):
         res = alpha * ((1 - pred) ** gamma) * (-(pred + 1e-8).log())
     else:
         res = (1 - alpha) * (pred ** gamma) * (-(1 - pred + 1e-8).log())
-    return res[...,0].mean(-1)  * 30
+    return res[...,0].mean(-1) 
 
 
 

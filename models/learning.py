@@ -7,19 +7,6 @@ from torch import nn, Tensor
 from util.misc import TrackInstances, Instances
 from ._loss import loss_fn_getter
 
-def build_learner(args, model):
-    # optimizer
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
-
-    # scheduler
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 10)
-    return optimizer, lr_scheduler
-
-def get_matcher(args):
-    if args.matcher == 'simple':
-        return SimpleMatcher()
-    else:
-        raise NotImplementedError(args.matcher)
 
 class Criterion(nn.Module):
     def __init__(self, args, model) -> None:
@@ -27,10 +14,10 @@ class Criterion(nn.Module):
         self.args = args
         self.matcher = get_matcher(args)
         self.losses = {
-            # 'is_object':1,    # FOCAL_LOSS: if there is an object or no 
-            # 'boxes':1,     # L1_LOSS: position of bounding boxes
-            # 'giou':.2,        # IntersectionOverUnion: position of bounding boxes (generalized)
-            'fake':.5,         # output to 0
+            'is_object':1,    # FOCAL_LOSS: if there is an object or no 
+            'boxes':1,     # L1_LOSS: position of bounding boxes
+            'giou':1,        # IntersectionOverUnion: position of bounding boxes (generalized)
+            # 'fake': 0,         # just for testing..
 
         } # TODO: select losses as args parameter
         self.required = set(self.matcher.required+sum([loss_fn_getter(loss).required for loss in self.losses], []))
@@ -141,3 +128,32 @@ class SimpleMatcher():
 
         return TrackInstances.cat([track_to_match, track_gt])
 
+
+
+def build_learner(args, model):
+    # optimizer
+    backbone = {
+        "params": [p for p in model.backbone.parameters()],
+        "lr": args.lr_backbone,
+    }
+    fast_learn = {
+        "params": [p for n,p in model.named_parameters() if n in args.lr_linear_proj_names],
+        "lr": args.lr * args.lr_linear_proj_mult,
+    }
+    prev = set(backbone['params']).union(fast_learn['params'])
+    other = {
+        "params": [p for p in model.parameters() if p not in prev],
+        "lr": args.lr,
+    }
+    optimizer = torch.optim.AdamW([backbone, fast_learn,other], lr=args.lr, weight_decay=args.weight_decay)
+
+    # scheduler
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 10)
+    return optimizer, lr_scheduler
+
+
+def get_matcher(args):
+    if args.matcher == 'simple':
+        return SimpleMatcher()
+    else:
+        raise NotImplementedError(args.matcher)

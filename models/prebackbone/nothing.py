@@ -4,7 +4,7 @@ import torchvision.transforms.functional as T
 
 class MinSize(torch.nn.Module):
 
-    def __init__(self, min_size=16):
+    def __init__(self, min_size=64):
         """Does nothing for preprocessing. Only checks if image is at least {minsizeXminsize}pixels (useful for exemplar)"""
         super().__init__()
         self.min_size=min_size

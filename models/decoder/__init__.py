@@ -1,5 +1,5 @@
 import torch.nn as nn
-
+import torch
 from .def_transformer import OriginalDefDetr
 
 def get_main_decoder(name, args):

@@ -2,6 +2,7 @@ outputs
 **.pth
 configs/*.tmp
 configs/*.args
+.vscode
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -13,21 +13,11 @@ def lossfn_fake(track_instances, output, gt_instance):
     track_instances.gt_idx = torch.cat((torch.arange(ngt), -torch.ones(len(track_instances.gt_idx)-ngt))).long().to(track_instances.gt_idx.device)
     gt_instance.boxes = torch.cat( (gt_box.to(gt_instance.boxes.device)[:ngt],gt_instance.boxes[ngt:]) )
 
-    # prob = output['is_object'][:,0,:50]
-    # l1 = 0 if not ngt else (((prob[:,:ngt])-100).abs()).mean()
-    # l2 = ((prob[:,ngt*2:]+100).abs()).mean()
-    # l1 = lossfn_is_object(track_instances, output, gt_instance)
-
-    # if torch.rand(1)<0.05:
-    #     print('####################')
-    #     print('# loss', l1.item())
-    #     print('# avg ', prob[:,:ngt].sigmoid().mean().item(), prob[:,ngt*2:].sigmoid().mean().item())
-    #     print('####################')
-
-    # l2 = lossfn_giou(track_instances, output, gt_instance)
+    l1 = lossfn_is_object(track_instances, output, gt_instance)
+    l2 = lossfn_giou(track_instances, output, gt_instance)
     l3 = lossfn_position(track_instances, output, gt_instance)
 
-    return l3
+    return l1+l2+l3
 
 
 
