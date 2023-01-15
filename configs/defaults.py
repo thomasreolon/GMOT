@@ -37,7 +37,7 @@ def get_args_parser():
     parser.add_argument('--num_workers', default=2, type=int)
     parser.add_argument('--cache_mode', action='store_true')
     parser.add_argument('--sample_mode', type=str, default='random_interval')
-    parser.add_argument('--sample_interval', type=int, default=20)
+    parser.add_argument('--sample_interval', type=int, default=3)
     parser.add_argument('--sampler_lengths', type=int, nargs='*', default=[5])
 
     # * Test
@@ -57,9 +57,9 @@ def get_args_parser():
     parser.add_argument('--num_feature_levels', default=4, type=int,        help='number of feature levels')
 
     # * Mixer
-    parser.add_argument('--mix_return', default=['ch','q','feat'], type=str, nargs='+', help="what to return from mixer")
+    # parser.add_argument('--mix_return', default=['ch','q','feat'], type=str, nargs='+', help="what to return from mixer")
     parser.add_argument('--mix_arch',   default='motr', type=str,            help="what to return from mixer")
-    parser.add_argument('--q_extractor', default='circle', type=str,         help="how to go from exemplar feature maps to less queries (avg, multiple)")
+    # parser.add_argument('--q_extractor', default='circle', type=str,         help="how to go from exemplar feature maps to less queries (avg, multiple)")
     parser.add_argument('--use_learned', action='store_true',                help="query embeddings from image features or from fixed-learned Embedding")
 
     # * Position Embedding
@@ -88,17 +88,17 @@ def get_args_parser():
     parser.add_argument('--matcher', default='simple', type=str,            help="hugarian(costMatrix) / simple(closest)")
 
 
-    parser.add_argument('--mix_match', action='store_true',)
-    parser.add_argument('--set_cost_class', default=2, type=float,          help="Class coefficient in the matching cost")
-    parser.add_argument('--set_cost_bbox', default=5, type=float,           help="L1 box coefficient in the matching cost")
-    parser.add_argument('--set_cost_giou', default=2, type=float,           help="giou box coefficient in the matching cost")
+    # parser.add_argument('--mix_match', action='store_true',)
+    # parser.add_argument('--set_cost_class', default=2, type=float,          help="Class coefficient in the matching cost")
+    # parser.add_argument('--set_cost_bbox', default=5, type=float,           help="L1 box coefficient in the matching cost")
+    # parser.add_argument('--set_cost_giou', default=2, type=float,           help="giou box coefficient in the matching cost")
 
-    # * Loss coefficients
-    parser.add_argument('--mask_loss_coef', default=1, type=float)
-    parser.add_argument('--dice_loss_coef', default=1, type=float)
-    parser.add_argument('--cls_loss_coef', default=4, type=float)
-    parser.add_argument('--bbox_loss_coef', default=5, type=float)
-    parser.add_argument('--giou_loss_coef', default=2, type=float)
-    parser.add_argument('--focal_alpha', default=0.12, type=float)
+    # # * Loss coefficients
+    # parser.add_argument('--mask_loss_coef', default=1, type=float)
+    # parser.add_argument('--dice_loss_coef', default=1, type=float)
+    # parser.add_argument('--cls_loss_coef', default=4, type=float)
+    # parser.add_argument('--bbox_loss_coef', default=5, type=float)
+    # parser.add_argument('--giou_loss_coef', default=2, type=float)
+    # parser.add_argument('--focal_alpha', default=0.12, type=float)
 
     return parser

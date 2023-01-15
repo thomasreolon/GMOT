@@ -78,6 +78,7 @@ class Visualizer():
         # helper functions for graphics
         self.debug_q_similarity(queries, img_features, q_ref, n_prop, path)
         self.debug_matching(frame, coord[-1], gt_boxes, matching, n_prop, path)
+        self.debug_qrefevolution(frame, q_ref, coord[-1], gt_boxes, outputs['matching_gt'], path)
         self.debug_qref_steps(frame, q_ref, coord, isobj, n_prop, path)
         self.debug_predictions(frame, outputs['matching_gt'], n_prop, coord[-1], path)
         self.debug_qref_start(frame, q_ref, n_prop, path)
@@ -113,6 +114,31 @@ class Visualizer():
             frame = np.concatenate(imgs, axis=1)
             cv2.imwrite(out_file, frame)
 
+
+    def debug_qrefevolution(self, frame, q_ref, coord, gt_boxes, matching, path):
+        out_file = self.args.output_dir+f'/debug/{path}evolution.jpg'
+        if not os.path.exists(out_file):
+            frame = self._debug_frame(frame, 800)
+
+            # init matched ref
+            start = q_ref[0, matching>=0].unsqueeze(0)
+            n_prop = start.shape[1] //2
+            frame = self._debug_qref(frame, start, n_prop, 1/10)
+
+            # predicted matched ref
+            end = coord[0, matching>=0].unsqueeze(0)
+            frame = self._debug_qref(frame, end, n_prop, 1/2)
+
+            # gt_boxes matched ref
+            gt = matching[matching>=0]
+            gt = gt_boxes[gt].unsqueeze(0)
+            frame = self._debug_qref(frame, gt, n_prop,    1)
+
+            # lines
+            frame = self._debug_lines(frame, start, end)
+            frame = self._debug_lines(frame, end, gt)
+
+            cv2.imwrite(out_file, frame)
 
     def debug_matching(self, frame, q_ref, gt_boxes, matching, n_prop, path):
         out_file = self.args.output_dir+f'/debug/{path}matching.jpg'
@@ -191,8 +217,7 @@ class Visualizer():
         """util to write q_refs on frame"""
         q_ref = q_ref[0,:,:2]
         H,W,_ = frame.shape
-        c2 = np.array([255,100,80])  # blue border
-        def clean(x,X): return int(max(0, min(X-1, x)))
+        c2 = np.array([0,0,0])  # blue border
         for i, (w, h) in enumerate(q_ref):
             color = np.array([80,250,90] if i<n_prop else [250,80,255]) # green prop;  purple gt
             w = int(w*W)

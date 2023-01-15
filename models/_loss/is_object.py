@@ -28,7 +28,7 @@ def isobj(pred, positive, alpha=0.8, gamma=2.0):
         res = alpha * ((1 - pred) ** gamma) * (-(pred + 1e-8).log())
     else:
         res = (1 - alpha) * (pred ** gamma) * (-(1 - pred + 1e-8).log())
-    return res[...,0].mean(-1)
+    return res[...,0].mean(-1)  * 30
 
 
 

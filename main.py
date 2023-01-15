@@ -22,7 +22,7 @@ def main(args):
     device = torch.device(args.device)
 
     # Build Model
-    model      = build_model(args)                          # transformer tracker
+    model      = build_model(args).to(device)               # transformer tracker
     optimizer, lr_scheduler = build_learner(args, model)    # loss function: models_outputs, ground_truth --> scalar
     tr_dataset = build_dataset('train', args)               # dict(imgs, gt_instances, exemplar) 
 

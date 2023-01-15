@@ -39,4 +39,5 @@ def giou(pred_box, tgt_box):
     wh = (rb - lt) # [6,1,N,2]
     area = wh[..., 0] * wh[..., 1]
 
-    return 1-(iou - (area - union) / area).mean(-1) # 6,1
+    #     Maximize IoU             Minimize difference area/union (incourages small boxes?)
+    return (1 - iou).mean(-1) +  ((area - union) / area).mean(-1)    # 6,1

@@ -15,13 +15,14 @@ import sys
 import numpy as np
 
 import torch
+from models.gmot import GMOT
 
 import util.multiprocess as utils
 
 # TODO: batchsize
 # TODO: in main: fn "change params between epochs"   t=[t1,t2,t3,t2,t1];  new_p=t[int(len(t)*epoch/n_epochs)]  ;  set_param(new_p)
 
-def train_one_epoch(model: torch.nn.Module, 
+def train_one_epoch(model: GMOT, 
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
                     device: torch.device, epoch: int, args: dict, debug:str):
 
@@ -35,7 +36,7 @@ def train_one_epoch(model: torch.nn.Module,
 
     # for samples, targets in metric_logger.log_every(data_loader, print_freq, header):
     for d_i, data_dict in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
-        di_debug = debug+f'b{d_i}_' if debug and (d_i==half or d_i==2 or d_i==300) else None
+        di_debug = debug+f'b{d_i}_' if debug and (d_i==2 or d_i==30 or d_i==150 or d_i==half) else None
 
         # To cuda
         data_dict = utils.data_dict_to_cuda(data_dict, device)
@@ -56,8 +57,11 @@ def train_one_epoch(model: torch.nn.Module,
                 sys.exit(1)
 
         # Backward
+        print('='*100)
+        print(torch.isnan(model.mixer.q_embed.weight).sum(), torch.isnan(model.mixer.ref_pts.weight).sum())
         optimizer.zero_grad()
         losses.backward()
+
         if args.clip_max_norm > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_max_norm)
         else:

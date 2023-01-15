@@ -113,16 +113,26 @@ class GMOT(torch.nn.Module):
         coord = self.prebk._fix_pad(coord, mask)
         output.update({'output_hs':hs, 'boxes':coord, 'is_object':isobj})
         out_debug.update({'q_ref':track_instances.q_ref, 'boxes':coord, 'is_object':isobj, 'input_hs':track_instances.q_emb})
+        output['asd'] = self.mixer.ref_pts.weight
 
         ##################   LOSS  ###################
 
         # macthing & loss computation
         track_instances, loss_dict = self.criterion.forward_intra_frame(track_instances, output, gt_inst)
-        out_debug.update({'matching_gt':track_instances.gt_idx})
+        out_debug.update({'matching_gt':track_instances.gt_idx, 'gtboxes':gt_inst.boxes})
+
+        if torch.isnan(list(loss_dict.values())[0]):
+            for w in (track_instances.q_ref, track_instances.q_emb, img_features[2], list(self.decoder.decoder.head.parameters())[0]):
+                print('-->', torch.isnan(w).sum())
 
         # makes visualizations
         if self.debug:
             self.visualizer.visualize_infographics(out_debug, path=self.debug+str(self.debug_i))
+        if (torch.rand(1)*11).int()%7==1 and not torch.is_grad_enabled() and self.debug_i==0:
+            print('...............', '..................')
+            print('gt boxes',(gt_inst.boxes[:2].detach().cpu()*100).int().tolist(),    '\npred boxes',(coord[-1,0,:2].detach().cpu()*100).int().tolist(), '\nrand boxes',(coord[-1,0,-2:].detach().cpu()*100).int().tolist())
+            print('.pred-1 isobj',isobj[-1,0,:2,0].sigmoid().detach().cpu().tolist(), '\n.pred-0 isobj',isobj[-1,0,48:50,0].sigmoid().detach().cpu().tolist())
+            print('() avg ', output['is_object'][:,0,:10].sigmoid().mean().item(), output['is_object'][:,0,10:50].sigmoid().mean().item())
 
         track_instances = track_instances.get_tracks_next_frame(coord, hs, isobj)
 

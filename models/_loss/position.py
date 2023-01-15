@@ -1,21 +1,53 @@
 import torch
 from ._loss_utils import matching_preds_gt, multiplier_decoder_level
-from util.misc import box_cxcywh_to_xyxy
+from util.misc import box_cxcywh_to_xyxy, inverse_sigmoid
+
+printed=[]
 
 def lossfn_position(track_instances, output, gt_instance):
     """L1 loss between predicted and real"""
 
     pred, sorted_target = matching_preds_gt(track_instances.gt_idx, output['boxes'], gt_instance)
 
-    loss = position(pred, sorted_target.boxes)      # loss
-    return multiplier_decoder_level(loss).mean()
+    loss = position(pred, sorted_target.boxes)
+    # loss2 = position_step(pred, sorted_target.boxes)
+
+    if (torch.isnan(pred).sum()>0):
+        print('aaaaaaaaaaaaaaaaaaaaaaa')
+        if printed.__len__()==0:
+            printed.append(0)
+            print(
+                '| tgt  ',  sorted_target.boxes.mean(),
+                '\n| pred  ', pred.mean(),
+                '\n| ref  ',  track_instances.q_ref.mean(),
+                '\n| emb  ',  track_instances.q_emb.mean(),
+            )
+ 
+
+    return multiplier_decoder_level(loss).mean() # + loss2
 
 lossfn_position.is_intra_loss = True
 lossfn_position.required = ['boxes']
 
 
-
 def position(pred_box, tgt_box):
     """in_shapes pred[6,1,N,4] tgt[N,4]"""
     if pred_box.numel()==0: return torch.zeros(*pred_box.shape[:-2],1,1,device=pred_box.device)
-    return (pred_box-tgt_box[None,None]).abs().mean(-2)
+    loss =  (pred_box-tgt_box[None,None]).abs().mean(-2)
+
+
+    return loss
+
+
+def position_step(pred_box, tgt_box):
+    """penalizes steps in the wrong direction"""
+    if pred_box.shape[0] == 1 or pred_box.numel()==0: return torch.zeros(*pred_box.shape[:-2],1,1,device=pred_box.device)
+
+    dist = ((pred_box-tgt_box[None,None])*3)**2
+    with torch.no_grad():
+        bad_steps = dist[:-1] - dist[1:] < 0
+
+    loss = bad_steps * dist[1:]
+
+    return loss.mean(-2) * 100
+

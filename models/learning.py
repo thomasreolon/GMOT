@@ -9,7 +9,7 @@ from ._loss import loss_fn_getter
 
 def build_learner(args, model):
     # optimizer
-    optimizer = torch.optim.AdamW(model.parameters())
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
 
     # scheduler
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 10)
@@ -27,10 +27,10 @@ class Criterion(nn.Module):
         self.args = args
         self.matcher = get_matcher(args)
         self.losses = {
-            'is_object':1,    # FOCAL_LOSS: if there is an object or no 
-            'boxes':1,     # L1_LOSS: position of bounding boxes
+            # 'is_object':1,    # FOCAL_LOSS: if there is an object or no 
+            # 'boxes':1,     # L1_LOSS: position of bounding boxes
             # 'giou':.2,        # IntersectionOverUnion: position of bounding boxes (generalized)
-            # 'fake':.5,         # output to 0
+            'fake':.5,         # output to 0
 
         } # TODO: select losses as args parameter
         self.required = set(self.matcher.required+sum([loss_fn_getter(loss).required for loss in self.losses], []))
@@ -63,7 +63,8 @@ class Criterion(nn.Module):
         final_losses = {k:0 for k in losses_dict[0].keys() if 'loss_' in k}
         coeff_frame_loss = self._get_loss_coeff(losses_dict)
         for loss_dict, coeff in zip(losses_dict, coeff_frame_loss):
-            final_losses = {k:  v1+loss_dict[k]*coeff[k]   for k,v1  in final_losses.items()}
+            final_losses = {k:  v1+loss_dict[k]   for k,v1  in final_losses.items()}
+            # final_losses = {k:  v1+loss_dict[k]*coeff[k]   for k,v1  in final_losses.items()}
         
         for loss, multiplier in self.losses.items():
             loss_fn = loss_fn_getter(loss)
@@ -81,7 +82,7 @@ class Criterion(nn.Module):
         for k in l1.keys():
             if 'loss_' not in k: continue
             rateo = (l2[k] - (l1[k]+1e-8)) / (len(losses_dict)-0.98)
-            base = 1 if rateo<0 else 1+l1[k]-l2[k]
+            base = 1 if rateo>=0 else 1+l1[k]-l2[k]
             coeffs = base + torch.arange(len(losses_dict), device=l1[k].device, dtype=l1[k].dtype)*rateo
             for i,c in enumerate(coeffs):
                 coeff_frame_loss[i][k] = 1/c

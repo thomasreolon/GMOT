@@ -52,7 +52,6 @@ class GeneralMixer(nn.Module):
         dict_outputs:dict
     ) -> Tuple[List[Tensor], TrackInstances, Tensor, Tensor]:
 
-
         # uses img_features and exemplar to get initial queries positions
         multiscale_img_feats, q_ref_pts, add_keys = \
             self.mixer(multiscale_img_feats, multiscale_exe_features, exe_masks, dict_outputs)
@@ -61,7 +60,6 @@ class GeneralMixer(nn.Module):
         # make input tensors for decorer:   eg.   q_embedd = cat(track.embedd, gt)
         attn_mask = self.update_track_instances(multiscale_img_feats, q_ref_pts, track_instances, noised_gt_boxes)
 
-    
         return multiscale_img_feats, add_keys, attn_mask
 
 
@@ -69,10 +67,10 @@ class GeneralMixer(nn.Module):
         dev = track_instances.q_emb.device
         # queries to detect new tracks
         if q_prop_refp is None:
-            q_prop_refp = self.ref_pts.weight.data.sigmoid()
+            q_prop_refp = self.ref_pts.weight.sigmoid()
         
         if self.args.use_learned: # learned embeddings (MOTR LIKE)
-            q_prop_emb  = self.q_embed.weight.data
+            q_prop_emb  = self.q_embed.weight
         else:
             q_prop_emb  = self.make_q_from_ref(q_prop_refp, img_features)
 
@@ -83,7 +81,11 @@ class GeneralMixer(nn.Module):
         else:
             q_gt_refp = noised_gt.clamp(0,0.9998)
             if self.args.use_learned:
-                q_gt_emb  = self.q_embed_gt.weight.data[:len(noised_gt)]
+                q_gt_emb  = torch.zeros((0, q_prop_emb.shape[1]),device=dev)
+                l = len(noised_gt)
+                while l>0:
+                    q_gt_emb  = torch.cat((q_gt_emb,self.q_embed_gt.weight[:l]),dim=0)
+                    l -=   q_gt_emb.shape[0]
             else:
                 q_gt_emb  = self.make_q_from_ref(q_gt_refp, img_features)
 
