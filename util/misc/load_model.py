@@ -1,14 +1,13 @@
 import torch
 import os
-from ..multiprocess import data_dict_to_cuda
 
-def load_checkpoint(args, model, optimizer, lr_scheduler):
+def load_checkpoint(args, model, optimizer=None, lr_scheduler=None):
     # load only weights
     if args.pretrained is not None and args.resume is None:
         load_model(model, args.pretrained)
 
     # special case: load last checkpoint
-    if args.resume=='':
+    if args.resume=='__last__':
         tmp = args.output_dir + '/checkpoint.pth'
         args.resume = tmp if os.path.exists(tmp) else None
 
@@ -18,7 +17,8 @@ def load_checkpoint(args, model, optimizer, lr_scheduler):
         print(f'resuming ...')
         checkpoint = load_model(model, args.resume)
 
-        if 'optimizer' in checkpoint and 'lr_scheduler' in checkpoint and 'epoch' in checkpoint:
+        if 'optimizer' in checkpoint and 'lr_scheduler' in checkpoint and 'epoch' in checkpoint and \
+        optimizer is not None    and lr_scheduler is not None:
             import copy
             p_groups = copy.deepcopy(optimizer.param_groups)
             optimizer.load_state_dict(checkpoint['optimizer'])
@@ -33,8 +33,8 @@ def load_checkpoint(args, model, optimizer, lr_scheduler):
 
 
 def load_model(model, model_path):
+    print(f'loading pretrained {model_path}')
     checkpoint = torch.load(model_path, map_location='cpu')
-    print(f'loaded pretrained {model_path}')
     state_dict = checkpoint['model']
     model_state_dict = model.state_dict()
 
@@ -70,3 +70,19 @@ def load_model(model, model_path):
 
     return checkpoint
 
+def load_for_eval(args):
+    ARCHITECTURE = ['img_prep', 'backbone', 'num_feature_levels', 'mix_arch', 'use_learned', 'position_embedding', 'num_queries', 'dec_name', 'dec_layers', 'dec_n_points', 'dim_feedforward', 'nheads', 'embedd_dim']
+    model_path = args.resume or args.pretrained or args.output_dir + '/checkpoint.pth'
+
+    print("loading... ", model_path)
+    checkpoint = torch.load(model_path, map_location='cpu')
+
+    if 'args' in checkpoint:
+        old_args = checkpoint['args']
+        for k in ARCHITECTURE:
+            args.__dict__[k] = old_args.__getattribute__(k)
+
+    from models.gmot import build as build_model
+    model = build_model(args)
+    load_model(model, model_path)
+    return model.eval()

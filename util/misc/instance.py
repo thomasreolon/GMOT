@@ -213,10 +213,10 @@ class TrackInstances(Instances):
             self._embedd_dim = start['embedd_dim']
             self._conf_thresh = start['det_thresh']
             self._keep_for = start['keep_for']+1
-            self._idxs = _idxs
     
         if init:
             self._idxs = [0,0] # how many queries from prev iteration there are ; how many queries from this iteration ; the other are gt_queries
+            self._maxid = 0
             self.q_emb = torch.zeros(0,self._embedd_dim)
             self.q_ref = torch.zeros(0,4)
             self.score = torch.zeros(0)
@@ -239,7 +239,7 @@ class TrackInstances(Instances):
         if not is_gt:
             self._idxs[1] = len(self)
 
-    def get_tracks_next_frame(self, refs, emb, score):
+    def get_tracks_next_frame(self, refs, emb, score, is_train=True):
         # drop GT queries
         new_prev = self.get_prevnew_queries()
         n = len(new_prev)
@@ -250,10 +250,11 @@ class TrackInstances(Instances):
         new_prev.score = score[-1,0,:n,0].sigmoid()
 
         # possible detections
-        threshold = new_prev.score.mean() + new_prev.score.std()
+        threshold = new_prev.score.mean() + new_prev.score.std() if is_train else 0
         threshold = max(threshold, new_prev._conf_thresh)
         good_score = new_prev.score > threshold
 
+        print('detected', good_score.sum())
 
         # assigned by matcher
         assigned = new_prev.gt_idx >= 0
@@ -270,6 +271,8 @@ class TrackInstances(Instances):
 
         new_prev.lives -= 1
         new_prev._idxs = [len(new_prev), len(new_prev)]
+
+        print('retuer', len(new_prev))
         return new_prev
 
     #           (     from previous frame     )  (         new detection queries          )  (    gt queries    )

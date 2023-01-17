@@ -83,7 +83,7 @@ def get_args_parser():
 
     # LOSS
     # * Matcher
-    parser.add_argument('--matcher', default='simple', type=str,            help="hugarian(costMatrix) / simple(closest)")
+    parser.add_argument('--matcher', default='  ', type=str,            help="hugarian(costMatrix) / simple(closest)")
 
 
     # parser.add_argument('--mix_match', action='store_true',)

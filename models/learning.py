@@ -148,7 +148,7 @@ def build_learner(args, model):
     optimizer = torch.optim.AdamW([backbone, fast_learn,other], lr=args.lr, weight_decay=args.weight_decay)
 
     # scheduler
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 10)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 5, .4)
     return optimizer, lr_scheduler
 
 

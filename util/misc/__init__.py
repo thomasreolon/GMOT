@@ -2,7 +2,7 @@
 from .instance import Instances, TrackInstances
 
 # functions to load checkpoints
-from .load_model import load_checkpoint, load_model
+from .load_model import load_checkpoint, load_model, load_for_eval
 
 # save GPU memory with checkpointing (recomputes values during backward)
 from .backward_ckpt import CheckpointFunction, decompose_output

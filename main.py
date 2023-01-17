@@ -49,7 +49,6 @@ def main(args):
         # Train
         train_one_epoch(model, data_loader_train, optimizer, device, epoch, args, debug)
         lr_scheduler.step()
-        tr_dataset.step_epoch()
 
         # Save
         if args.output_dir:

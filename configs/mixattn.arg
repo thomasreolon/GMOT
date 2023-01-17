@@ -1,7 +1,7 @@
 --backbone resnet50
---num_feature_levels 4
+--num_feature_levels 3
 --mix_arch addkeys
 --position_embedding gauss_cat
 --dec_name addkeys
---dec_layers 3
---nheads 4
+--dec_layers 5
+--nheads 8

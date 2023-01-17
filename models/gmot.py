@@ -96,7 +96,7 @@ class GMOT(torch.nn.Module):
         mask = mask2 if mask is None else mask[None] | mask2
         img_features, img_masks = self.backbone(frame, mask)
         output.update({'img_features':img_features, 'exe_features':exe_features}) # TODO: move inside each component?
-        out_debug.update({'frame':frame, 'gtboxes':gt_inst.boxes})
+        out_debug.update({'frame':frame})
 
         # share information between exemplar & input frame
         # returns img_feat[[B,C,H1,W1],[B,C,H2,W2],..]   and    queries positions [[xywh],[xywh],[xywh],...]
@@ -110,10 +110,9 @@ class GMOT(torch.nn.Module):
 
         # transformer for tracking
         hs, isobj, coord = self.decoder(img_features, add_keys, track_instances, attn_mask, img_masks)
-        coord = self.prebk._fix_pad(coord, mask)
+        coord = self.prebk._fix_pad(coord, mask2)
         output.update({'output_hs':hs, 'boxes':coord, 'is_object':isobj})
         out_debug.update({'q_ref':track_instances.q_ref, 'boxes':coord, 'is_object':isobj, 'input_hs':track_instances.q_emb})
-        output['asd'] = self.mixer.ref_pts.weight
 
         ##################   LOSS  ###################
 
@@ -167,8 +166,35 @@ class GMOT(torch.nn.Module):
         return tmp[0]
 
 
+    @torch.no_grad()
+    def forward_frame_eval(self, frame, track_instances:TrackInstances, exemplars):
+        exe_features, exe_masks = self.backbone(*self.prebk(exemplars))
 
+        if track_instances is None:
+            track_instances = TrackInstances(vars(self.args), True).to(frame.device)
+        
+        # extract multi scale features from image [[B,C,H1,W1],[B,C,H2,W2],..]
+        frame, mask = self.prebk(frame)
+        img_features, img_masks = self.backbone(frame, mask)
 
+        img_features, add_keys, attn_mask = self.mixer(img_features, exe_features, exe_masks, track_instances, None, {}) # add noise to gt_queries (trains network to denoise GT)
+
+        # add positional embeddings to queries & keys
+        img_features, track_instances = self.posembed(img_features, track_instances)
+
+        # transformer for tracking
+        hs, isobj, coord = self.decoder(img_features, add_keys, track_instances, attn_mask, img_masks)
+        coord = self.prebk._fix_pad(coord, mask)
+
+        ############ postprocessing
+        scores = isobj[-1, 0, :, 0]
+        detections = torch.where((scores>=self.args.det_thresh) & (track_instances.obj_idx==-1))
+
+        track_instances.obj_idx[detections] = torch.arange(track_instances._maxid, track_instances._maxid+len(detections), device=frame.device).long()
+        track_instances._maxid = track_instances._maxid+len(detections)
+
+        track_instances.get_tracks_next_frame(coord, hs, isobj, is_train=False)
+        return track_instances      
 
 
 

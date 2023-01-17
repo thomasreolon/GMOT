@@ -59,7 +59,7 @@ class Visualizer():
         cv2.imwrite(out_d+'/debug/gt_visualize.jpg', imgs)
 
     @torch.no_grad()
-    def visualize_infographics(self, outputs, path):
+    def visualize_infographics(self, outputs, path, track_inst):
         os.makedirs(self.args.output_dir+'/debug/'+'/'.join(path.split('/')[:-1]), exist_ok=True)
 
         # info needed on that frame
